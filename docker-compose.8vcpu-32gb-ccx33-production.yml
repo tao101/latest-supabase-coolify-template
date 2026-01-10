@@ -319,7 +319,7 @@ services:
 
   supabase-db:
     image: supabase/postgres:15.14.1.071
-    shm_size: 2g
+    shm_size: 4g
     healthcheck:
       test: pg_isready -U postgres -h 127.0.0.1
       interval: 5s
