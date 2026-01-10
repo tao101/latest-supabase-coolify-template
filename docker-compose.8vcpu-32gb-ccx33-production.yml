@@ -332,7 +332,7 @@ services:
       - -c
       - config_file=/etc/postgresql/postgresql.conf
       - -c
-      - log_min_messages=fatal
+      - log_min_messages=warning
     environment:
       - POSTGRES_HOST=/var/run/postgresql
       - PGPORT=${POSTGRES_PORT:-5432}
