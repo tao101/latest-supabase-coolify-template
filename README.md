@@ -25,12 +25,45 @@ This template uses Coolify's magic environment variables for automatic secure cr
 
 All generated values appear in Coolify's Environment Variables UI and can be customized if needed.
 
+## Docker Compose Files
+
+| File | Use Case | Server Specs |
+|------|----------|--------------|
+| `docker-compose.yml` | Development, Staging | Any (default settings) |
+| `docker-compose.8vcpu-32gb-ccx33-production.yml` | **Production** | 8 vCPU, 32GB RAM, NVMe |
+
+### Production Config Optimizations
+
+The production configuration (`docker-compose.8vcpu-32gb-ccx33-production.yml`) includes:
+
+**PostgreSQL Tuning:**
+- `shared_buffers = 8GB` (25% of RAM)
+- `effective_cache_size = 24GB` (75% of RAM)
+- `work_mem = 64MB`
+- `max_parallel_workers = 8` (matches vCPU count)
+- NVMe optimizations (`random_page_cost = 1.1`)
+- Moderate autovacuum for large tables
+- Slow query logging (queries > 1s)
+
+**Connection Pooling (Supavisor):**
+- Pool size: 50 (default: 20)
+- Max clients: 1000 (default: 100)
+- DB pool: 25 (default: 5)
+
+**Realtime:**
+- File descriptors: 20000 (default: 10000)
+
+Designed for **200-500 concurrent users** with **10GB+ database** and **millions of rows**.
+
 ## Deployment
 
 1. In Coolify, create a new service from Docker Compose
-2. Paste or import this `docker-compose.yml`
-3. Deploy - Coolify will auto-generate all secrets
-4. Access Supabase Studio at your configured domain
+2. Choose the appropriate file:
+   - **Dev/Staging**: Use `docker-compose.yml`
+   - **Production**: Use `docker-compose.8vcpu-32gb-ccx33-production.yml`
+3. Paste or import the chosen file
+4. Deploy - Coolify will auto-generate all secrets
+5. Access Supabase Studio at your configured domain
 
 ## Services Included
 
@@ -87,6 +120,20 @@ After deployment, find your API keys in Coolify's Environment Variables:
 - **Anon Key**: `SERVICE_SUPABASEANON_KEY` - Use in frontend applications
 - **Service Key**: `SERVICE_SUPABASESERVICE_KEY` - Use in backend/server-side only (has full access)
 - **JWT Secret**: `SERVICE_PASSWORD_JWT` - For verifying/signing custom JWTs
+
+## Verifying Production Settings
+
+After deploying the production config, verify PostgreSQL settings:
+
+```sql
+-- Connect to your database and run:
+SHOW shared_buffers;        -- Should show: 8GB
+SHOW effective_cache_size;  -- Should show: 24GB
+SHOW work_mem;              -- Should show: 64MB
+SHOW max_parallel_workers;  -- Should show: 8
+```
+
+Monitor slow queries in Supabase Studio under Logs > Postgres.
 
 ## Links
 
