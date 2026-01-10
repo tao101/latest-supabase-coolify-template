@@ -631,7 +631,6 @@ services:
           log_min_duration_statement = 1000
           log_checkpoints = on
           log_lock_waits = on
-      - supabase-db-config:/etc/postgresql-custom
 
   supabase-analytics:
     image: supabase/logflare:1.27.3
@@ -1236,5 +1235,4 @@ services:
 
 volumes:
   supabase-db-data:
-  supabase-db-config:
   supabase-storage-data:
