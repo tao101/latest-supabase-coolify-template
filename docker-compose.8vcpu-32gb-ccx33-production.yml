@@ -1153,6 +1153,8 @@ services:
 
   supabase-supavisor:
     image: supabase/supavisor:2.7.4
+    ports:
+      - "6543:5432"  # Expose pooler for external connections (transaction mode)
     ulimits:
       nofile:
         soft: 100000
