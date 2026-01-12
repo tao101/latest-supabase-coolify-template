@@ -5,7 +5,7 @@
 #
 # Key optimizations:
 #   - PostgreSQL: 8GB shared_buffers, 24GB effective_cache, NVMe tuning
-#   - Supavisor: 50 pool size, 1000 max clients
+#   - Supavisor: 250 pool size, 2000 max clients
 #   - Realtime: 20000 file descriptors
 #
 # For dev/staging, use the default docker-compose.yml instead.
@@ -334,6 +334,46 @@ services:
       - config_file=/etc/postgresql/postgresql.conf
       - -c
       - log_min_messages=warning
+      - -c
+      - shared_buffers=8GB
+      - -c
+      - effective_cache_size=24GB
+      - -c
+      - work_mem=64MB
+      - -c
+      - maintenance_work_mem=2GB
+      - -c
+      - wal_buffers=64MB
+      - -c
+      - checkpoint_completion_target=0.9
+      - -c
+      - max_wal_size=4GB
+      - -c
+      - min_wal_size=1GB
+      - -c
+      - max_worker_processes=8
+      - -c
+      - max_parallel_workers=8
+      - -c
+      - max_parallel_workers_per_gather=4
+      - -c
+      - max_parallel_maintenance_workers=4
+      - -c
+      - max_connections=500
+      - -c
+      - random_page_cost=1.1
+      - -c
+      - effective_io_concurrency=200
+      - -c
+      - autovacuum_vacuum_scale_factor=0.1
+      - -c
+      - autovacuum_analyze_scale_factor=0.05
+      - -c
+      - log_min_duration_statement=1000
+      - -c
+      - log_checkpoints=on
+      - -c
+      - log_lock_waits=on
     environment:
       - POSTGRES_HOST=/var/run/postgresql
       - PGPORT=${POSTGRES_PORT:-5432}
@@ -618,7 +658,7 @@ services:
           max_parallel_maintenance_workers = 4
 
           # ----- Connections -----
-          max_connections = 200
+          max_connections = 500
 
           # ----- NVMe Storage Optimizations -----
           random_page_cost = 1.1
@@ -892,7 +932,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
       - LOGFLARE_API_KEY=${SERVICE_PASSWORD_LOGFLARE}
-    command: ["--config", "etc/vector/vector.yml"]
+    command: ["--config", "/etc/vector/vector.yml"]
 
   supabase-rest:
     image: postgrest/postgrest:v14.3
@@ -1178,9 +1218,9 @@ services:
     environment:
       - POOLER_TENANT_ID=${POOLER_TENANT_ID:-dev_tenant}
       - POOLER_POOL_MODE=transaction
-      - POOLER_DEFAULT_POOL_SIZE=${POOLER_DEFAULT_POOL_SIZE:-50}
-      - POOLER_MAX_CLIENT_CONN=${POOLER_MAX_CLIENT_CONN:-1000}
-      - DB_POOL_SIZE=${POOLER_DB_POOL_SIZE:-25}
+      - POOLER_DEFAULT_POOL_SIZE=${POOLER_DEFAULT_POOL_SIZE:-250}
+      - POOLER_MAX_CLIENT_CONN=${POOLER_MAX_CLIENT_CONN:-2000}
+      - DB_POOL_SIZE=${POOLER_DB_POOL_SIZE:-100}
       - PORT=4000
       - POSTGRES_PORT=${POSTGRES_PORT:-5432}
       - POSTGRES_HOSTNAME=${POSTGRES_HOSTNAME:-supabase-db}
