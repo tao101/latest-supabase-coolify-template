@@ -1,3 +1,16 @@
+# =============================================================================
+# PRODUCTION CONFIG: 4 vCPU / 16GB RAM Server
+# =============================================================================
+# Optimized for: 100-250 concurrent users, medium database workloads
+#
+# Key optimizations:
+#   - PostgreSQL: 4GB shared_buffers, 12GB effective_cache, 250 max connections
+#   - Supavisor: 150 pool size, 1000 max clients
+#   - Realtime: 15000 file descriptors
+#
+# For larger servers (8 vCPU / 32GB RAM), use docker-compose.8vcpu-32gb-ccx33-production.yml
+# =============================================================================
+#
 # documentation: https://supabase.com/docs/guides/self-hosting/docker
 # slogan: The open source Firebase alternative - Latest version without Edge Functions
 # tags: supabase, firebase, alternative, open-source, postgres, auth, storage, realtime
@@ -306,6 +319,7 @@ services:
 
   supabase-db:
     image: supabase/postgres:15.14.1.071
+    shm_size: 2g
     healthcheck:
       test: pg_isready -U postgres -h 127.0.0.1
       interval: 5s
@@ -319,7 +333,47 @@ services:
       - -c
       - config_file=/etc/postgresql/postgresql.conf
       - -c
-      - log_min_messages=fatal
+      - log_min_messages=warning
+      - -c
+      - shared_buffers=4GB
+      - -c
+      - effective_cache_size=12GB
+      - -c
+      - work_mem=32MB
+      - -c
+      - maintenance_work_mem=1GB
+      - -c
+      - wal_buffers=64MB
+      - -c
+      - checkpoint_completion_target=0.9
+      - -c
+      - max_wal_size=2GB
+      - -c
+      - min_wal_size=512MB
+      - -c
+      - max_worker_processes=4
+      - -c
+      - max_parallel_workers=4
+      - -c
+      - max_parallel_workers_per_gather=2
+      - -c
+      - max_parallel_maintenance_workers=2
+      - -c
+      - max_connections=250
+      - -c
+      - random_page_cost=1.1
+      - -c
+      - effective_io_concurrency=200
+      - -c
+      - autovacuum_vacuum_scale_factor=0.1
+      - -c
+      - autovacuum_analyze_scale_factor=0.05
+      - -c
+      - log_min_duration_statement=1000
+      - -c
+      - log_checkpoints=on
+      - -c
+      - log_lock_waits=on
     environment:
       - POSTGRES_HOST=/var/run/postgresql
       - PGPORT=${POSTGRES_PORT:-5432}
@@ -577,7 +631,6 @@ services:
           create schema if not exists _analytics;
           alter schema _analytics owner to :pguser;
           \c postgres
-      - supabase-db-config:/etc/postgresql-custom
 
   supabase-analytics:
     image: supabase/logflare:1.27.3
@@ -838,7 +891,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
       - LOGFLARE_API_KEY=${SERVICE_PASSWORD_LOGFLARE}
-    command: ["--config", "etc/vector/vector.yml"]
+    command: ["--config", "/etc/vector/vector.yml"]
 
   supabase-rest:
     image: postgrest/postgrest:v14.3
@@ -923,8 +976,8 @@ services:
     container_name: realtime-dev.supabase-realtime
     ulimits:
       nofile:
-        soft: 10000
-        hard: 10000
+        soft: 15000
+        hard: 15000
     depends_on:
       supabase-db:
         condition: service_healthy
@@ -962,7 +1015,7 @@ services:
       - ERL_AFLAGS=-proto_dist inet_tcp
       - ENABLE_TAILSCALE=false
       - DNS_NODES=''
-      - RLIMIT_NOFILE=10000
+      - RLIMIT_NOFILE=15000
       - APP_NAME=realtime
       - SEED_SELF_HOST=true
       - LOG_LEVEL=error
@@ -1124,9 +1177,9 @@ services:
     environment:
       - POOLER_TENANT_ID=${POOLER_TENANT_ID:-dev_tenant}
       - POOLER_POOL_MODE=transaction
-      - POOLER_DEFAULT_POOL_SIZE=${POOLER_DEFAULT_POOL_SIZE:-20}
-      - POOLER_MAX_CLIENT_CONN=${POOLER_MAX_CLIENT_CONN:-100}
-      - DB_POOL_SIZE=${POOLER_DB_POOL_SIZE:-5}
+      - POOLER_DEFAULT_POOL_SIZE=${POOLER_DEFAULT_POOL_SIZE:-150}
+      - POOLER_MAX_CLIENT_CONN=${POOLER_MAX_CLIENT_CONN:-1000}
+      - DB_POOL_SIZE=${POOLER_DB_POOL_SIZE:-50}
       - PORT=4000
       - POSTGRES_PORT=${POSTGRES_PORT:-5432}
       - POSTGRES_HOSTNAME=${POSTGRES_HOSTNAME:-supabase-db}
@@ -1184,5 +1237,4 @@ services:
 
 volumes:
   supabase-db-data:
-  supabase-db-config:
   supabase-storage-data:
