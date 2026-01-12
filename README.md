@@ -113,6 +113,91 @@ POSTGRES_DB=postgres
 POSTGRES_PORT=5432
 ```
 
+## Database Connection Strings
+
+This template exposes two database connection methods:
+
+| Type | Port | Use Case |
+|------|------|----------|
+| **Direct** | 5432 | Migrations, admin tasks, long-running queries |
+| **Pooled** | 6543 | Application queries, serverless, high concurrency |
+
+### Connection String Formats
+
+**Direct Connection** (bypasses connection pooler):
+```
+postgres://postgres:PASSWORD@your-domain.com:5432/postgres
+```
+
+**Pooled Connection** (through Supavisor):
+```
+postgres://postgres.dev_tenant:PASSWORD@your-domain.com:6543/postgres
+```
+
+The pooled connection uses the format `postgres.{POOLER_TENANT_ID}` as the username. The default tenant ID is `dev_tenant`.
+
+### ORM Configuration (Prisma/Drizzle)
+
+For ORMs that support separate connections for queries and migrations:
+
+```env
+# Pooled - for application queries
+DATABASE_URL="postgres://postgres.dev_tenant:PASSWORD@your-domain.com:6543/postgres?pgbouncer=true"
+
+# Direct - for migrations
+DIRECT_URL="postgres://postgres:PASSWORD@your-domain.com:5432/postgres"
+```
+
+**Prisma schema.prisma:**
+```prisma
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+```
+
+### When to Use Each Connection
+
+| Use Case | Connection | Why |
+|----------|------------|-----|
+| App database queries | Pooled (6543) | Efficient connection reuse |
+| Prisma/Drizzle queries | Pooled (6543) | Better concurrency handling |
+| Database migrations | Direct (5432) | Migrations need stable connections |
+| Long-running queries | Direct (5432) | Avoids pooler timeouts |
+| Admin/debugging | Direct (5432) | Full connection control |
+| Serverless functions | Pooled (6543) | Handles connection limits |
+
+## Firewall Configuration
+
+When using cloud providers with firewalls, ensure these ports are open:
+
+| Port | Protocol | Service |
+|------|----------|---------|
+| 22 | TCP | SSH access |
+| 80 | TCP | HTTP (redirects to HTTPS) |
+| 443 | TCP | HTTPS - Supabase Studio & API |
+| 5432 | TCP | Direct PostgreSQL connection |
+| 6543 | TCP | Pooled PostgreSQL (Supavisor) |
+
+### Hetzner Cloud Firewall
+
+1. Go to [console.hetzner.cloud](https://console.hetzner.cloud)
+2. Select your **Project** → **Firewalls**
+3. Click on your firewall (or create one)
+4. Add **Inbound Rules** for each port:
+   - Protocol: TCP
+   - Port: (see table above)
+   - Source IPs: `0.0.0.0/0` (or restrict to specific IPs)
+5. Ensure the firewall is attached to your server
+
+### Other Cloud Providers
+
+- **AWS**: Configure Security Groups with inbound rules
+- **GCP**: Configure VPC firewall rules
+- **DigitalOcean**: Configure Cloud Firewalls
+- **Azure**: Configure Network Security Groups
+
 ## Accessing Your API Keys
 
 After deployment, find your API keys in Coolify's Environment Variables:
