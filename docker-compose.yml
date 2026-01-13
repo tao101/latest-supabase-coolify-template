@@ -1,11 +1,11 @@
 # =============================================================================
 # PRODUCTION CONFIG: 4 vCPU / 16GB RAM Server
 # =============================================================================
-# Optimized for: 100-250 concurrent users, medium database workloads
+# Optimized for: 150-250 concurrent users, medium database workloads
 #
 # Key optimizations:
-#   - PostgreSQL: 4GB shared_buffers, 12GB effective_cache, 250 max connections
-#   - Supavisor: 150 pool size, 1000 max clients
+#   - PostgreSQL: 4GB shared_buffers, 12GB effective_cache, 350 max connections
+#   - Supavisor: 250 pool size, 1500 max clients, session mode default
 #   - Realtime: 15000 file descriptors
 #
 # For larger servers (8 vCPU / 32GB RAM), use docker-compose.8vcpu-32gb-ccx33-production.yml
@@ -359,7 +359,7 @@ services:
       - -c
       - max_parallel_maintenance_workers=2
       - -c
-      - max_connections=250
+      - max_connections=350
       - -c
       - random_page_cost=1.1
       - -c
@@ -1176,10 +1176,10 @@ services:
         condition: service_healthy
     environment:
       - POOLER_TENANT_ID=${POOLER_TENANT_ID:-dev_tenant}
-      - POOLER_POOL_MODE=transaction
-      - POOLER_DEFAULT_POOL_SIZE=${POOLER_DEFAULT_POOL_SIZE:-150}
-      - POOLER_MAX_CLIENT_CONN=${POOLER_MAX_CLIENT_CONN:-1000}
-      - DB_POOL_SIZE=${POOLER_DB_POOL_SIZE:-50}
+      - POOLER_POOL_MODE=${POOLER_POOL_MODE:-session}
+      - POOLER_DEFAULT_POOL_SIZE=${POOLER_DEFAULT_POOL_SIZE:-250}
+      - POOLER_MAX_CLIENT_CONN=${POOLER_MAX_CLIENT_CONN:-1500}
+      - DB_POOL_SIZE=${POOLER_DB_POOL_SIZE:-250}
       - PORT=4000
       - POSTGRES_PORT=${POSTGRES_PORT:-5432}
       - POSTGRES_HOSTNAME=${POSTGRES_HOSTNAME:-supabase-db}
