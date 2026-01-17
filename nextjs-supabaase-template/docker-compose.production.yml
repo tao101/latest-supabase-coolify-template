@@ -1,0 +1,75 @@
+# =============================================================================
+# Production Docker Compose - Next.js Application Only
+# =============================================================================
+# This configuration runs ONLY the Next.js application.
+# It connects to the parent Supabase services (docker-compose.yml in parent dir).
+#
+# Deployment:
+#   - Deploy parent Supabase docker-compose.yml first
+#   - Deploy this file second
+#   - Both must be on the same Docker network
+#
+# Coolify:
+#   - Coolify auto-populates SERVICE_* variables
+#   - Ensure DOCKER_NETWORK matches the parent Supabase network
+# =============================================================================
+
+services:
+  nextjs-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nextjs-app
+    restart: unless-stopped
+    ports:
+      - "${NEXTJS_PORT:-3001}:3001"
+    environment:
+      # =========================================
+      # CLIENT-SIDE (exposed to browser)
+      # =========================================
+      # External URL for browser/client-side requests
+      - NEXT_PUBLIC_SUPABASE_URL=${SERVICE_URL_SUPABASEKONG}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${SERVICE_SUPABASEANON_KEY}
+
+      # =========================================
+      # SERVER-SIDE ONLY (never exposed to browser)
+      # =========================================
+      # Internal Docker network URL for server-side requests (API routes, Server Components)
+      # This is faster and doesn't require DNS resolution
+      - SUPABASE_URL=http://supabase-kong:8000
+      - SUPABASE_SERVICE_KEY=${SERVICE_SUPABASESERVICE_KEY}
+
+      # =========================================
+      # DATABASE CONNECTIONS
+      # =========================================
+      # Pooled connection via Supavisor (for app queries)
+      - DATABASE_URL=postgres://postgres.${POOLER_TENANT_ID:-dev_tenant}:${SERVICE_PASSWORD_POSTGRES}@supabase-supavisor:5432/${POSTGRES_DB:-postgres}?pgbouncer=true
+      # Direct connection (for migrations - bypasses connection pooler)
+      - DIRECT_URL=postgres://postgres:${SERVICE_PASSWORD_POSTGRES}@supabase-db:5432/${POSTGRES_DB:-postgres}
+
+      # =========================================
+      # APPLICATION CONFIG
+      # =========================================
+      - NODE_ENV=production
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:3001/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s  # Allow time for migrations
+    depends_on:
+      supabase-kong:
+        condition: service_healthy
+      supabase-db:
+        condition: service_healthy  # Wait for DB before migrations
+      supabase-auth:
+        condition: service_healthy  # Wait for auth service
+      supabase-rest:
+        condition: service_started  # Wait for PostgREST
+    networks:
+      - default
+
+networks:
+  default:
+    external: true
+    name: ${DOCKER_NETWORK:-supabase_default}
