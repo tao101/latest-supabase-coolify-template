@@ -57,15 +57,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 60s  # Allow time for migrations
-    depends_on:
-      supabase-kong:
-        condition: service_healthy
-      supabase-db:
-        condition: service_healthy  # Wait for DB before migrations
-      supabase-auth:
-        condition: service_healthy  # Wait for auth service
-      supabase-rest:
-        condition: service_started  # Wait for PostgREST
     networks:
       - default
 
