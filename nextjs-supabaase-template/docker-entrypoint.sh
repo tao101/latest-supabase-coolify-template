@@ -38,16 +38,21 @@ fi
 
 # Run Supabase migrations if supabase folder exists
 if [ -d "./supabase/migrations" ]; then
-    echo "Running Supabase migrations..."
+    if [ -z "$DIRECT_URL" ]; then
+        echo "WARNING: supabase/migrations folder found but DIRECT_URL is not set."
+        echo "Skipping migrations. Set DIRECT_URL to enable database migrations."
+    else
+        echo "Running Supabase migrations..."
 
-    # Push migrations to the database using Supabase CLI
-    # Flags:
-    #   --db-url: Direct database connection (not pooled)
-    #   --include-all: Include all migrations not found on remote history table
-    #   yes |: Auto-confirm prompts for CI/non-interactive environments
-    yes | npx supabase db push --db-url "$DIRECT_URL" --include-all
+        # Push migrations to the database using Supabase CLI
+        # Flags:
+        #   --db-url: Direct database connection (not pooled)
+        #   --include-all: Include all migrations not found on remote history table
+        #   yes |: Auto-confirm prompts for CI/non-interactive environments
+        yes | npx supabase db push --db-url "$DIRECT_URL" --include-all
 
-    echo "Supabase migrations completed successfully."
+        echo "Supabase migrations completed successfully."
+    fi
 else
     echo "No supabase/migrations folder found, skipping migrations."
 fi
