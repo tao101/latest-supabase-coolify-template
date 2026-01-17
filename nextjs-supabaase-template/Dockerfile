@@ -1,5 +1,5 @@
 # =============================================================================
-# Multi-stage Dockerfile for Next.js 15 with Supabase Migration Support
+# Multi-stage Dockerfile for Next.js 16 with Supabase Migration Support
 # =============================================================================
 # Production-ready build with automatic database migrations using Supabase CLI
 # Optimized for Coolify deployment with minimal image size

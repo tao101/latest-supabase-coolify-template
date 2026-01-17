@@ -8,8 +8,14 @@ const nextConfig = {
   // Reference: https://nextjs.org/docs/app/api-reference/config/next-config-js/output
   output: 'standalone',
 
-  // Next.js 15: Recommended settings
+  // Next.js 16: Recommended settings
   reactStrictMode: true,
+
+  // Next.js 16: Turbopack is now configured at the top level (no longer experimental)
+  // Uncomment to enable Turbopack with custom options:
+  // turbopack: {
+  //   // options
+  // },
 
   // =============================================================================
   // Optional: Image optimization domains
@@ -37,5 +43,5 @@ const nextConfig = {
 };
 
 // CommonJS export (works with both .js and .mjs)
-// For ES modules (Next.js 15 default), use: export default nextConfig;
+// For ES modules (Next.js 16 default), use: export default nextConfig;
 module.exports = nextConfig;
