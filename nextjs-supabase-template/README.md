@@ -14,7 +14,7 @@ A complete local development stack that runs Next.js alongside a full Supabase i
 
 ```bash
 # 1. Copy template files to your Next.js project
-cp -r nextjs-supabaase-template/* your-nextjs-project/
+cp -r nextjs-supabase-template/* your-nextjs-project/
 
 # 2. Configure environment
 cd your-nextjs-project
@@ -125,6 +125,45 @@ docker compose -f docker-compose.development.yml down -v
 - **Code Changes**: Instantly reflected in the browser
 - **Package Changes**: Container auto-reinstalls dependencies when `package.json` changes
 - **Environment Changes**: Requires container restart
+
+### Node Modules Sync (Linux Only)
+
+By default, this template uses **true bidirectional node_modules sync** between your host machine and the container. This means:
+
+- Install packages on your host (`pnpm add lodash`) → immediately available in the container
+- Install packages in the container → immediately available on your host
+- Your IDE gets full IntelliSense and type definitions
+
+**Why this works on Linux:** Both the host (Linux) and container (Alpine Linux) use the same binary format, so native modules compiled on one work on the other.
+
+### macOS and Windows Compatibility
+
+On macOS and Windows, native Node modules (like `esbuild`, `sharp`, etc.) are compiled for different platforms than the Linux container. To avoid binary incompatibility issues, you need to isolate the container's `node_modules`.
+
+**Add this volume to `docker-compose.development.yml`:**
+
+```yaml
+# In the nextjs-app service, modify the volumes section:
+volumes:
+  - ./:/app                 # Mount local code for hot-reload
+  - /app/node_modules       # ADD THIS LINE - Isolate container's node_modules
+  - /app/.next              # Exclude build directory
+```
+
+**Trade-offs with isolated node_modules:**
+
+| Feature | Linux (synced) | macOS/Windows (isolated) |
+|---------|----------------|--------------------------|
+| IDE IntelliSense | ✅ Full support | ⚠️ Requires local `npm install` |
+| Package install location | Either host or container | Container only |
+| Native module compatibility | ✅ Works | ✅ Works |
+| Disk space | Shared | Duplicated |
+
+**Recommended workflow for macOS/Windows:**
+
+1. Add the `/app/node_modules` volume isolation line
+2. Run `pnpm install` (or `npm install`) locally for IDE support
+3. Let the container manage its own `node_modules` for runtime
 
 ### Package Manager Support
 
