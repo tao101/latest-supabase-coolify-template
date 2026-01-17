@@ -24,9 +24,9 @@ COPY package.json package-lock.json* yarn.lock* pnpm-lock.yaml* bun.lock* ./
 # Install dependencies based on lockfile present
 RUN \
   if [ -f bun.lock ]; then npm install -g bun && bun install --frozen-lockfile; \
+  elif [ -f pnpm-lock.yaml ]; then corepack enable pnpm && pnpm i --frozen-lockfile; \
   elif [ -f yarn.lock ]; then yarn --frozen-lockfile; \
   elif [ -f package-lock.json ]; then npm ci; \
-  elif [ -f pnpm-lock.yaml ]; then corepack enable pnpm && pnpm i --frozen-lockfile; \
   else echo "No lockfile found." && exit 1; \
   fi
 
@@ -43,8 +43,17 @@ COPY . .
 # Disable Next.js telemetry during build
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Build the application
-RUN npm run build
+# Build using the same package manager that installed dependencies
+RUN \
+  if [ -f bun.lock ]; then npm install -g bun && bun run build; \
+  elif [ -f pnpm-lock.yaml ]; then corepack enable pnpm && pnpm run build; \
+  elif [ -f yarn.lock ]; then yarn build; \
+  elif [ -f package-lock.json ]; then npm run build; \
+  else npm run build; \
+  fi
+
+# Ensure supabase folder exists (even if empty) for COPY in runner stage
+RUN mkdir -p supabase
 
 # =============================================================================
 # Stage 3: Production Runner
