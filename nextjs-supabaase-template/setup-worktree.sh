@@ -54,6 +54,48 @@ update_env_var() {
     fi
 }
 
+# Function to generate a random secret (32 chars alphanumeric)
+generate_secret() {
+    openssl rand -base64 32 | tr -dc 'a-zA-Z0-9' | head -c 32
+}
+
+# Function to add a variable only if it doesn't exist (for secrets)
+generate_if_missing() {
+    local key=$1
+    local value=$2
+    if [ -f .env ]; then
+        if ! grep -q "^${key}=" .env; then
+            echo "${key}=${value}" >> .env
+        fi
+    else
+        echo "${key}=${value}" >> .env
+    fi
+}
+
+# =============================================================================
+# Supabase JWT credentials (must match - keys are signed with the secret)
+# Using official Supabase demo credentials (same as `supabase init`)
+# For production (Coolify), these are auto-populated via SERVICE_* variables
+# =============================================================================
+SUPABASE_JWT_SECRET="super-secret-jwt-token-with-at-least-32-characters-long"
+SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0"
+SUPABASE_SERVICE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU"
+
+# Generate all required SERVICE_* variables (only if they don't exist)
+generate_if_missing "SERVICE_PASSWORD_POSTGRES" "$(generate_secret)"
+generate_if_missing "SERVICE_PASSWORD_JWT" "$SUPABASE_JWT_SECRET"
+generate_if_missing "SERVICE_SUPABASEANON_KEY" "$SUPABASE_ANON_KEY"
+generate_if_missing "SERVICE_SUPABASESERVICE_KEY" "$SUPABASE_SERVICE_KEY"
+generate_if_missing "SERVICE_PASSWORD_LOGFLARE" "$(generate_secret)"
+generate_if_missing "SERVICE_PASSWORD_METACRYPTO" "$(generate_secret)"
+generate_if_missing "SERVICE_PASSWORD_REALTIME" "$(generate_secret)"
+generate_if_missing "SERVICE_PASSWORD_SUPAVISORSECRET" "$(generate_secret)"
+generate_if_missing "SERVICE_PASSWORD_VAULTENC" "$(generate_secret)"
+generate_if_missing "SERVICE_USER_MINIO" "minioadmin"
+generate_if_missing "SERVICE_PASSWORD_MINIO" "$(generate_secret)"
+generate_if_missing "SERVICE_USER_ADMIN" "admin"
+generate_if_missing "SERVICE_PASSWORD_ADMIN" "$(generate_secret)"
+
 # Update the port variables
 update_env_var "COMPOSE_PROJECT_NAME" "$PROJECT_NAME"
 update_env_var "NEXTJS_PORT" "$NEXTJS_PORT"
