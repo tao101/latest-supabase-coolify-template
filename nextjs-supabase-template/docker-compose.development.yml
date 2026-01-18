@@ -731,7 +731,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
       - LOGFLARE_API_KEY=${SERVICE_PASSWORD_LOGFLARE}
-    command:
+    entrypoint:
       - sh
       - -c
       - |
