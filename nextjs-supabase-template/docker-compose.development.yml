@@ -36,7 +36,7 @@ services:
           ([ -f supabase/seed.sql ] && bunx supabase db seed --db-url \"$$DIRECT_URL\" || true) &&
           bun dev
         elif [ -f pnpm-lock.yaml ]; then
-          corepack enable && corepack prepare pnpm@latest --activate &&
+          npm install -g pnpm &&
           pnpm install &&
           ([ -d supabase/migrations ] && yes | pnpm dlx supabase db push --db-url \"$$DIRECT_URL\" --include-all || true) &&
           ([ -f supabase/seed.sql ] && pnpm dlx supabase db seed --db-url \"$$DIRECT_URL\" || true) &&
