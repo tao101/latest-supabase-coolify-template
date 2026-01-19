@@ -99,3 +99,7 @@ next-env.d.ts
 
 # Docker
 docker-compose.override.yml
+
+# playwright screenshots
+playwright-report
+.playwright-mcp

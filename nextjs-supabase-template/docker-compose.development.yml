@@ -59,6 +59,7 @@ services:
       # Client-side (browser) - localhost for development
       - NEXT_PUBLIC_SUPABASE_URL=http://localhost:${KONG_PORT:-8000}
       - NEXT_PUBLIC_SUPABASE_ANON_KEY=${SERVICE_SUPABASEANON_KEY}
+      - NEXT_PUBLIC_FRONTEND_URL=http://localhost:${NEXTJS_PORT:-3001}
 
       # Server-side - internal Docker network
       - SUPABASE_URL=http://supabase-kong:8000
@@ -371,7 +372,7 @@ services:
       supabase-analytics:
         condition: service_healthy
     environment:
-      - HOSTNAME="::"
+      - HOSTNAME=0.0.0.0
       - STUDIO_PG_META_URL=http://supabase-meta:8080
       - POSTGRES_HOST=${POSTGRES_HOSTNAME:-supabase-db}
       - POSTGRES_PORT=5432
@@ -996,7 +997,7 @@ services:
       - API_EXTERNAL_URL=http://localhost:${KONG_PORT:-8000}
       - GOTRUE_DB_DRIVER=postgres
       - GOTRUE_DB_DATABASE_URL=postgres://supabase_auth_admin:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOSTNAME:-supabase-db}:5432/${POSTGRES_DB:-postgres}
-      - GOTRUE_SITE_URL=http://localhost:${NEXTJS_PORT:-3001}
+      - GOTRUE_SITE_URL=${NEXT_PUBLIC_FRONTEND_URL:-http://localhost:${NEXTJS_PORT:-3001}}
       - GOTRUE_URI_ALLOW_LIST=${ADDITIONAL_REDIRECT_URLS:-}
       - GOTRUE_DISABLE_SIGNUP=${DISABLE_SIGNUP:-false}
       - GOTRUE_JWT_ADMIN_ROLES=service_role

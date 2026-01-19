@@ -41,6 +41,7 @@ services:
       # Client-side (browser) - uses public Supabase URL
       - NEXT_PUBLIC_SUPABASE_URL=https://${SERVICE_FQDN_SUPABASEKONG}
       - NEXT_PUBLIC_SUPABASE_ANON_KEY=${SERVICE_SUPABASEANON_KEY}
+      - NEXT_PUBLIC_FRONTEND_URL=https://${SERVICE_FQDN_NEXTJSAPP}
       # Server-side - internal Docker network
       - SUPABASE_URL=http://supabase-kong:8000
       - SUPABASE_SERVICE_KEY=${SERVICE_SUPABASESERVICE_KEY}
