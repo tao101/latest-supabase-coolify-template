@@ -25,7 +25,7 @@ services:
     image: node:22-alpine
     container_name: ${COMPOSE_PROJECT_NAME:?COMPOSE_PROJECT_NAME is required - run ./setup-worktree.sh first}-nextjs-app
     working_dir: /app
-    user: "${UID:-1000}:${GID:-1000}"
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
     # Install deps, run Supabase migrations (with auto-confirm), run seeds if exist, then start dev server
     # Auto-detects package manager: bun > pnpm (preferred) > yarn > npm (fallback)
     command: >

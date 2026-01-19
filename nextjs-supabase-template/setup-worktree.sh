@@ -172,9 +172,10 @@ echo ""
 echo "Starting Docker Compose..."
 echo ""
 
-# Export UID and GID for Docker to run as current user (fixes node_modules permissions)
-export UID=$(id -u)
-export GID=$(id -g)
+# Export HOST_UID and HOST_GID for Docker to run as current user (fixes node_modules permissions)
+# Note: We use HOST_UID/HOST_GID instead of UID/GID because UID is a readonly bash builtin
+export HOST_UID=$(id -u)
+export HOST_GID=$(id -g)
 
 docker compose -f docker-compose.development.yml up -d
 
