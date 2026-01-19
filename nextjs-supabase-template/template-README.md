@@ -44,6 +44,7 @@ cp docker-compose.production.yml your-project/
 cp Dockerfile your-project/
 cp docker-entrypoint.sh your-project/
 cp setup-worktree.sh your-project/
+cp cleanup-worktree.sh your-project/
 cp .env.example your-project/
 cp next.config.example.js your-project/  # Reference for standalone output
 ```
@@ -101,6 +102,24 @@ docker compose -f docker-compose.development.yml down
 
 # Stop and remove volumes (resets database)
 docker compose -f docker-compose.development.yml down -v
+```
+
+### Cleaning Up a Worktree
+
+Use the cleanup script for complete removal of Docker resources:
+
+```bash
+# Interactive cleanup (asks for confirmation)
+./cleanup-worktree.sh
+
+# Force cleanup without confirmation
+./cleanup-worktree.sh --force
+
+# Stop containers but keep database volumes
+./cleanup-worktree.sh --keep-volumes
+
+# Full cleanup including .env file
+./cleanup-worktree.sh --clean-env
 ```
 
 ### Available URLs
@@ -269,6 +288,29 @@ main/          → Next.js: 3005, Supabase: 8005
 feature-auth/  → Next.js: 3023, Supabase: 8023
 ```
 
+### Cleaning Up Worktrees
+
+When a worktree branch is merged and no longer needed, use the cleanup script to remove all Docker resources:
+
+```bash
+cd ../my-feature
+./cleanup-worktree.sh
+```
+
+**Command-line Options:**
+
+| Option | Description |
+|--------|-------------|
+| `-f, --force` | Skip confirmation prompt |
+| `--keep-volumes` | Stop containers but preserve database data |
+| `--clean-env` | Also remove the .env file |
+| `-h, --help` | Show help message |
+
+The script will:
+1. Stop and remove all 15 containers for this worktree
+2. Remove associated Docker volumes (database + storage data)
+3. Show a summary of cleaned resources
+
 ## Production Deployment
 
 ### Using docker-compose.production.yml
@@ -391,6 +433,19 @@ docker compose -f docker-compose.development.yml exec supabase-db \
 ```
 
 ### Reset everything
+
+**Option 1: Using the cleanup script (recommended)**
+
+```bash
+# Complete cleanup including .env file
+./cleanup-worktree.sh --clean-env
+
+# Start fresh
+./setup-worktree.sh
+docker compose -f docker-compose.development.yml up
+```
+
+**Option 2: Manual reset**
 
 ```bash
 # Stop containers and remove volumes

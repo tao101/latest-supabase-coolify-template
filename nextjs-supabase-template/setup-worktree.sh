@@ -171,6 +171,11 @@ print_info
 echo ""
 echo "Starting Docker Compose..."
 echo ""
+
+# Export UID and GID for Docker to run as current user (fixes node_modules permissions)
+export UID=$(id -u)
+export GID=$(id -g)
+
 docker compose -f docker-compose.development.yml up -d
 
 # Wait for database to be healthy
