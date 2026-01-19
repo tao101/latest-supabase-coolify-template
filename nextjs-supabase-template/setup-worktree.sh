@@ -40,10 +40,10 @@ update_env_var() {
     if [ -f .env ]; then
         if grep -q "^${key}=" .env; then
             # Variable exists (uncommented), update all occurrences
-            sed -i "s/^${key}=.*/${key}=${value}/" .env
+            sed -i "s|^${key}=.*|${key}=${value}|" .env
         elif grep -q "^# *${key}=" .env; then
             # Variable is commented out, uncomment and update only the first occurrence
-            sed -i "0,/^# *${key}=.*/s/^# *${key}=.*/${key}=${value}/" .env
+            sed -i "0,\|^# *${key}=.*|s|^# *${key}=.*|${key}=${value}|" .env
         else
             # Variable doesn't exist, append to file
             echo "${key}=${value}" >> .env
@@ -86,7 +86,10 @@ generate_if_missing "SERVICE_PASSWORD_POSTGRES" "$(generate_secret)"
 generate_if_missing "SERVICE_PASSWORD_JWT" "$SUPABASE_JWT_SECRET"
 generate_if_missing "SERVICE_SUPABASEANON_KEY" "$SUPABASE_ANON_KEY"
 generate_if_missing "SERVICE_SUPABASESERVICE_KEY" "$SUPABASE_SERVICE_KEY"
-generate_if_missing "SERVICE_PASSWORD_LOGFLARE" "$(generate_secret)"
+# Generate shared secret for LOGFLARE (needed both as LOGFLARE_API_KEY and SERVICE_PASSWORD_LOGFLARE)
+_logflare_secret=$(generate_secret)
+generate_if_missing "LOGFLARE_API_KEY" "$_logflare_secret"
+generate_if_missing "SERVICE_PASSWORD_LOGFLARE" "$_logflare_secret"
 generate_if_missing "SERVICE_PASSWORD_METACRYPTO" "$(generate_secret)"
 generate_if_missing "SERVICE_PASSWORD_REALTIME" "$(generate_secret)"
 generate_if_missing "SERVICE_PASSWORD_SUPAVISORSECRET" "$(generate_secret)"
@@ -103,16 +106,77 @@ update_env_var "KONG_PORT" "$KONG_PORT"
 update_env_var "POSTGRES_PORT" "$POSTGRES_PORT"
 update_env_var "POOLER_PORT" "$POOLER_PORT"
 
-echo "=========================================="
-echo "Worktree configured: $DIR_NAME"
-echo "=========================================="
-echo "Project:    $PROJECT_NAME (offset: $OFFSET)"
+# Set Next.js Supabase environment variables
+update_env_var "NEXT_PUBLIC_SUPABASE_ANON_KEY" "$SUPABASE_ANON_KEY"
+update_env_var "SUPABASE_SERVICE_KEY" "$SUPABASE_SERVICE_KEY"
+update_env_var "NEXT_PUBLIC_SUPABASE_URL" "http://localhost:${KONG_PORT}"
+
+# =============================================================================
+# Read back generated secrets from .env for display
+# =============================================================================
+get_env_var() {
+    local key=$1
+    grep "^${key}=" .env 2>/dev/null | cut -d= -f2-
+}
+
+POSTGRES_PASSWORD=$(get_env_var "SERVICE_PASSWORD_POSTGRES")
+JWT_SECRET=$(get_env_var "SERVICE_PASSWORD_JWT")
+ANON_KEY=$(get_env_var "SERVICE_SUPABASEANON_KEY")
+SERVICE_KEY=$(get_env_var "SERVICE_SUPABASESERVICE_KEY")
+ADMIN_USER=$(get_env_var "SERVICE_USER_ADMIN")
+ADMIN_PASSWORD=$(get_env_var "SERVICE_PASSWORD_ADMIN")
+
+# Truncate keys for display (show first 50 chars + ...)
+truncate_key() {
+    local key=$1
+    if [ ${#key} -gt 50 ]; then
+        echo "${key:0:50}..."
+    else
+        echo "$key"
+    fi
+}
+
+# Function to display credentials info
+print_info() {
+    echo "=========================================="
+    echo "Worktree configured: $DIR_NAME"
+    echo "=========================================="
+    echo "Project:    $PROJECT_NAME (offset: $OFFSET)"
+    echo ""
+    echo "Ports:"
+    echo "  Next.js:    http://localhost:${NEXTJS_PORT}"
+    echo "  Supabase:   http://localhost:${KONG_PORT}"
+    echo "  PostgreSQL: localhost:${POSTGRES_PORT}"
+    echo "  Pooler:     localhost:${POOLER_PORT}"
+    echo ""
+    echo "Credentials:"
+    echo "  JWT Secret:           $JWT_SECRET"
+    echo "  Supabase Anon Key:    $(truncate_key "$ANON_KEY")"
+    echo "  Supabase Service Key: $(truncate_key "$SERVICE_KEY")"
+    echo ""
+    echo "Database:"
+    echo "  URL: postgres://postgres:${POSTGRES_PASSWORD}@localhost:${POSTGRES_PORT}/postgres"
+    echo ""
+    echo "Supabase Studio:"
+    echo "  URL:      http://localhost:${KONG_PORT}"
+    echo "  Username: $ADMIN_USER"
+    echo "  Password: $ADMIN_PASSWORD"
+    echo "=========================================="
+}
+
+# Show info before docker starts
+print_info
+
 echo ""
-echo "Ports:"
-echo "  Next.js:    http://localhost:${NEXTJS_PORT}"
-echo "  Supabase:   http://localhost:${KONG_PORT}"
-echo "  PostgreSQL: localhost:${POSTGRES_PORT}"
-echo "  Pooler:     localhost:${POOLER_PORT}"
+echo "Starting Docker Compose..."
 echo ""
-echo "Run: docker compose -f docker-compose.development.yml up"
+docker compose -f docker-compose.development.yml up -d
+
+# Show info again after docker output (easy to see at end)
+echo ""
+print_info
+echo ""
+echo "Commands:"
+echo "  View logs: docker compose -f docker-compose.development.yml logs -f"
+echo "  Stop:      docker compose -f docker-compose.development.yml down"
 echo "=========================================="

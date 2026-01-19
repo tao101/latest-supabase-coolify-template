@@ -456,7 +456,7 @@ services:
           CREATE FUNCTION supabase_functions.http_request()
             RETURNS trigger
             LANGUAGE plpgsql
-            AS $function$
+            AS $$function$$
             DECLARE
               request_id bigint;
               payload jsonb;
@@ -519,9 +519,9 @@ services:
                 (TG_RELID, TG_NAME, request_id);
               RETURN NEW;
             END
-          $function$;
+          $$function$$;
           DO
-          $$
+          $$$$
           BEGIN
             IF NOT EXISTS (
               SELECT 1
@@ -532,7 +532,7 @@ services:
               CREATE USER supabase_functions_admin NOINHERIT CREATEROLE LOGIN NOREPLICATION;
             END IF;
           END
-          $$;
+          $$$$;
           GRANT ALL PRIVILEGES ON SCHEMA supabase_functions TO supabase_functions_admin;
           GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA supabase_functions TO supabase_functions_admin;
           GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA supabase_functions TO supabase_functions_admin;
@@ -542,7 +542,7 @@ services:
           ALTER function "supabase_functions".http_request() OWNER TO supabase_functions_admin;
           GRANT supabase_functions_admin TO postgres;
           DO
-          $$
+          $$$$
           BEGIN
             IF EXISTS (
               SELECT 1
@@ -555,9 +555,9 @@ services:
               DROP ROLE supabase_pg_net_admin;
             END IF;
           END
-          $$;
+          $$$$;
           DO
-          $$
+          $$$$
           BEGIN
             IF EXISTS (
               SELECT 1
@@ -576,11 +576,11 @@ services:
               GRANT EXECUTE ON FUNCTION net.http_post(url text, body jsonb, params jsonb, headers jsonb, timeout_milliseconds integer) TO supabase_functions_admin, postgres, anon, authenticated, service_role;
             END IF;
           END
-          $$;
+          $$$$;
           CREATE OR REPLACE FUNCTION extensions.grant_pg_net_access()
           RETURNS event_trigger
           LANGUAGE plpgsql
-          AS $$
+          AS $$$$
           BEGIN
             IF EXISTS (
               SELECT 1
@@ -601,10 +601,10 @@ services:
               GRANT EXECUTE ON FUNCTION net.http_post(url text, body jsonb, params jsonb, headers jsonb, timeout_milliseconds integer) TO supabase_functions_admin, postgres, anon, authenticated, service_role;
             END IF;
           END;
-          $$;
+          $$$$;
           COMMENT ON FUNCTION extensions.grant_pg_net_access IS 'Grants access to pg_net';
           DO
-          $$
+          $$$$
           BEGIN
             IF NOT EXISTS (
               SELECT 1
@@ -615,7 +615,7 @@ services:
               EXECUTE PROCEDURE extensions.grant_pg_net_access();
             END IF;
           END
-          $$;
+          $$$$;
           INSERT INTO supabase_functions.migrations (version) VALUES ('20210809183423_update_grants');
           ALTER function supabase_functions.http_request() SECURITY DEFINER;
           ALTER function supabase_functions.http_request() SET search_path = supabase_functions;

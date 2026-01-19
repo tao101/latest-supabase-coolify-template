@@ -23,7 +23,7 @@ services:
   # ===========================================================================
   nextjs-app:
     image: node:22-alpine
-    container_name: ${COMPOSE_PROJECT_NAME:-dev}-nextjs-app
+    container_name: ${COMPOSE_PROJECT_NAME:?COMPOSE_PROJECT_NAME is required - run ./setup-worktree.sh first}-nextjs-app
     working_dir: /app
     # Install deps, run Supabase migrations (with auto-confirm), run seeds if exist, then start dev server
     # Auto-detects package manager: bun > pnpm (preferred) > yarn > npm (fallback)
@@ -87,7 +87,7 @@ services:
   # ===========================================================================
   supabase-kong:
     image: kong:2.8.1
-    container_name: ${COMPOSE_PROJECT_NAME:-dev}-supabase-kong
+    container_name: ${COMPOSE_PROJECT_NAME:?COMPOSE_PROJECT_NAME is required - run ./setup-worktree.sh first}-supabase-kong
     entrypoint:
       - bash
       - -c
@@ -355,7 +355,7 @@ services:
   # ===========================================================================
   supabase-studio:
     image: supabase/studio:2026.01.07-sha-037e5f9
-    container_name: ${COMPOSE_PROJECT_NAME:-dev}-supabase-studio
+    container_name: ${COMPOSE_PROJECT_NAME:?COMPOSE_PROJECT_NAME is required - run ./setup-worktree.sh first}-supabase-studio
     healthcheck:
       test:
         [
@@ -398,7 +398,7 @@ services:
   # ===========================================================================
   supabase-db:
     image: supabase/postgres:15.14.1.071
-    container_name: ${COMPOSE_PROJECT_NAME:-dev}-supabase-db
+    container_name: ${COMPOSE_PROJECT_NAME:?COMPOSE_PROJECT_NAME is required - run ./setup-worktree.sh first}-supabase-db
     shm_size: 1g
     healthcheck:
       test: pg_isready -U postgres -h 127.0.0.1
@@ -474,7 +474,7 @@ services:
         CREATE FUNCTION supabase_functions.http_request()
           RETURNS trigger
           LANGUAGE plpgsql
-          AS $function$
+          AS $$function$$
           DECLARE
             request_id bigint;
             payload jsonb;
@@ -537,9 +537,9 @@ services:
               (TG_RELID, TG_NAME, request_id);
             RETURN NEW;
           END
-        $function$;
+        $$function$$;
         DO
-        $$
+        $$$$
         BEGIN
           IF NOT EXISTS (
             SELECT 1
@@ -550,7 +550,7 @@ services:
             CREATE USER supabase_functions_admin NOINHERIT CREATEROLE LOGIN NOREPLICATION;
           END IF;
         END
-        $$;
+        $$$$;
         GRANT ALL PRIVILEGES ON SCHEMA supabase_functions TO supabase_functions_admin;
         GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA supabase_functions TO supabase_functions_admin;
         GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA supabase_functions TO supabase_functions_admin;
@@ -560,7 +560,7 @@ services:
         ALTER function "supabase_functions".http_request() OWNER TO supabase_functions_admin;
         GRANT supabase_functions_admin TO postgres;
         DO
-        $$
+        $$$$
         BEGIN
           IF EXISTS (
             SELECT 1
@@ -573,9 +573,9 @@ services:
             DROP ROLE supabase_pg_net_admin;
           END IF;
         END
-        $$;
+        $$$$;
         DO
-        $$
+        $$$$
         BEGIN
           IF EXISTS (
             SELECT 1
@@ -594,11 +594,11 @@ services:
             GRANT EXECUTE ON FUNCTION net.http_post(url text, body jsonb, params jsonb, headers jsonb, timeout_milliseconds integer) TO supabase_functions_admin, postgres, anon, authenticated, service_role;
           END IF;
         END
-        $$;
+        $$$$;
         CREATE OR REPLACE FUNCTION extensions.grant_pg_net_access()
         RETURNS event_trigger
         LANGUAGE plpgsql
-        AS $$
+        AS $$$$
         BEGIN
           IF EXISTS (
             SELECT 1
@@ -619,10 +619,10 @@ services:
             GRANT EXECUTE ON FUNCTION net.http_post(url text, body jsonb, params jsonb, headers jsonb, timeout_milliseconds integer) TO supabase_functions_admin, postgres, anon, authenticated, service_role;
           END IF;
         END;
-        $$;
+        $$$$;
         COMMENT ON FUNCTION extensions.grant_pg_net_access IS 'Grants access to pg_net';
         DO
-        $$
+        $$$$
         BEGIN
           IF NOT EXISTS (
             SELECT 1
@@ -633,7 +633,7 @@ services:
             EXECUTE PROCEDURE extensions.grant_pg_net_access();
           END IF;
         END
-        $$;
+        $$$$;
         INSERT INTO supabase_functions.migrations (version) VALUES ('20210809183423_update_grants');
         ALTER function supabase_functions.http_request() SECURITY DEFINER;
         ALTER function supabase_functions.http_request() SET search_path = supabase_functions;
@@ -680,7 +680,7 @@ services:
   # ===========================================================================
   supabase-analytics:
     image: supabase/logflare:1.27.3
-    container_name: ${COMPOSE_PROJECT_NAME:-dev}-supabase-analytics
+    container_name: ${COMPOSE_PROJECT_NAME:?COMPOSE_PROJECT_NAME is required - run ./setup-worktree.sh first}-supabase-analytics
     healthcheck:
       test: ["CMD", "curl", "http://127.0.0.1:4000/health"]
       timeout: 5s
@@ -713,7 +713,7 @@ services:
   # ===========================================================================
   supabase-vector:
     image: timberio/vector:0.28.1-alpine
-    container_name: ${COMPOSE_PROJECT_NAME:-dev}-supabase-vector
+    container_name: ${COMPOSE_PROJECT_NAME:?COMPOSE_PROJECT_NAME is required - run ./setup-worktree.sh first}-supabase-vector
     healthcheck:
       test:
         [
@@ -950,7 +950,7 @@ services:
   # ===========================================================================
   supabase-rest:
     image: postgrest/postgrest:v14.3
-    container_name: ${COMPOSE_PROJECT_NAME:-dev}-supabase-rest
+    container_name: ${COMPOSE_PROJECT_NAME:?COMPOSE_PROJECT_NAME is required - run ./setup-worktree.sh first}-supabase-rest
     depends_on:
       supabase-db:
         condition: service_healthy
@@ -971,7 +971,7 @@ services:
   # ===========================================================================
   supabase-auth:
     image: supabase/gotrue:v2.184.0
-    container_name: ${COMPOSE_PROJECT_NAME:-dev}-supabase-auth
+    container_name: ${COMPOSE_PROJECT_NAME:?COMPOSE_PROJECT_NAME is required - run ./setup-worktree.sh first}-supabase-auth
     depends_on:
       supabase-db:
         condition: service_healthy
@@ -1025,7 +1025,7 @@ services:
   # ===========================================================================
   realtime-dev:
     image: supabase/realtime:v2.69.2
-    container_name: ${COMPOSE_PROJECT_NAME:-dev}-realtime-dev
+    container_name: ${COMPOSE_PROJECT_NAME:?COMPOSE_PROJECT_NAME is required - run ./setup-worktree.sh first}-realtime-dev
     depends_on:
       supabase-db:
         condition: service_healthy
@@ -1076,7 +1076,7 @@ services:
   # ===========================================================================
   supabase-minio:
     image: minio/minio:RELEASE.2025-09-07T16-13-09Z
-    container_name: ${COMPOSE_PROJECT_NAME:-dev}-supabase-minio
+    container_name: ${COMPOSE_PROJECT_NAME:?COMPOSE_PROJECT_NAME is required - run ./setup-worktree.sh first}-supabase-minio
     environment:
       - MINIO_ROOT_USER=${SERVICE_USER_MINIO:-minioadmin}
       - MINIO_ROOT_PASSWORD=${SERVICE_PASSWORD_MINIO:-minioadmin}
@@ -1092,7 +1092,7 @@ services:
 
   minio-createbucket:
     image: minio/mc
-    container_name: ${COMPOSE_PROJECT_NAME:-dev}-minio-createbucket
+    container_name: ${COMPOSE_PROJECT_NAME:?COMPOSE_PROJECT_NAME is required - run ./setup-worktree.sh first}-minio-createbucket
     restart: "no"
     environment:
       - MINIO_ROOT_USER=${SERVICE_USER_MINIO:-minioadmin}
@@ -1113,7 +1113,7 @@ services:
   # ===========================================================================
   supabase-storage:
     image: supabase/storage-api:v1.33.4
-    container_name: ${COMPOSE_PROJECT_NAME:-dev}-supabase-storage
+    container_name: ${COMPOSE_PROJECT_NAME:?COMPOSE_PROJECT_NAME is required - run ./setup-worktree.sh first}-supabase-storage
     depends_on:
       supabase-db:
         condition: service_healthy
@@ -1180,7 +1180,7 @@ services:
   # ===========================================================================
   imgproxy:
     image: darthsim/imgproxy:v3.30.1
-    container_name: ${COMPOSE_PROJECT_NAME:-dev}-imgproxy
+    container_name: ${COMPOSE_PROJECT_NAME:?COMPOSE_PROJECT_NAME is required - run ./setup-worktree.sh first}-imgproxy
     healthcheck:
       test: ["CMD", "imgproxy", "health"]
       timeout: 5s
@@ -1199,7 +1199,7 @@ services:
   # ===========================================================================
   supabase-meta:
     image: supabase/postgres-meta:v0.95.1
-    container_name: ${COMPOSE_PROJECT_NAME:-dev}-supabase-meta
+    container_name: ${COMPOSE_PROJECT_NAME:?COMPOSE_PROJECT_NAME is required - run ./setup-worktree.sh first}-supabase-meta
     depends_on:
       supabase-db:
         condition: service_healthy
@@ -1219,7 +1219,7 @@ services:
   # ===========================================================================
   supabase-supavisor:
     image: supabase/supavisor:2.7.4
-    container_name: ${COMPOSE_PROJECT_NAME:-dev}-supabase-supavisor
+    container_name: ${COMPOSE_PROJECT_NAME:?COMPOSE_PROJECT_NAME is required - run ./setup-worktree.sh first}-supabase-supavisor
     ports:
       - "${POOLER_PORT:-6543}:5432"
     healthcheck:
