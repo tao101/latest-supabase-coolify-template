@@ -173,6 +173,28 @@ echo "Starting Docker Compose..."
 echo ""
 docker compose -f docker-compose.development.yml up -d
 
+# Wait for database to be healthy
+echo ""
+echo "Waiting for database to be ready..."
+MAX_RETRIES=30
+RETRY_COUNT=0
+until docker exec ${PROJECT_NAME}-supabase-db pg_isready -U postgres -h 127.0.0.1 > /dev/null 2>&1; do
+    RETRY_COUNT=$((RETRY_COUNT + 1))
+    if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
+        echo "Database did not become ready in time. Skipping migrations."
+        break
+    fi
+    echo "  Waiting for database... ($RETRY_COUNT/$MAX_RETRIES)"
+    sleep 2
+done
+
+# Run migrations if database is ready and migrations directory exists
+if [ $RETRY_COUNT -lt $MAX_RETRIES ] && [ -d "supabase/migrations" ]; then
+    echo ""
+    echo "Running Supabase migrations..."
+    PGSSLMODE=disable npx supabase db push --db-url "postgres://postgres:${POSTGRES_PASSWORD}@localhost:${POSTGRES_PORT}/postgres" --include-all --yes || echo "Migration failed or no changes to apply"
+fi
+
 # Show info again after docker output (easy to see at end)
 echo ""
 print_info
@@ -183,8 +205,8 @@ echo "  Stop:      docker compose -f docker-compose.development.yml down"
 echo "  Restart:   docker compose -f docker-compose.development.yml down && docker compose -f docker-compose.development.yml up -d"
 echo ""
 echo "Migrations:"
-echo "  Apply:     npx supabase db push --db-url postgres://postgres:${POSTGRES_PASSWORD}@localhost:${POSTGRES_PORT}/postgres --include-all"
+echo "  Apply:     PGSSLMODE=disable npx supabase db push --db-url 'postgres://postgres:${POSTGRES_PASSWORD}@localhost:${POSTGRES_PORT}/postgres' --include-all"
 echo ""
 echo "Database:"
-echo "  Reset:     npx supabase db reset --db-url postgres://postgres:${POSTGRES_PASSWORD}@localhost:${POSTGRES_PORT}/postgres"
+echo "  Reset:     PGSSLMODE=disable npx supabase db reset --db-url 'postgres://postgres:${POSTGRES_PASSWORD}@localhost:${POSTGRES_PORT}/postgres'"
 echo "=========================================="

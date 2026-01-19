@@ -32,24 +32,24 @@ services:
         if [ -f bun.lock ]; then
           npm install -g bun &&
           bun install &&
-          ([ -d supabase/migrations ] && yes | bunx supabase db push --db-url \"$$DIRECT_URL\" --include-all || true) &&
-          ([ -f supabase/seed.sql ] && bunx supabase db seed --db-url \"$$DIRECT_URL\" || true) &&
+          ([ -d supabase/migrations ] && yes | PGSSLMODE=disable bunx supabase db push --db-url \"$$DIRECT_URL\" --include-all || true) &&
+          ([ -f supabase/seed.sql ] && PGSSLMODE=disable bunx supabase db seed --db-url \"$$DIRECT_URL\" || true) &&
           bun dev
         elif [ -f pnpm-lock.yaml ]; then
           npm install -g pnpm &&
           pnpm install &&
-          ([ -d supabase/migrations ] && yes | pnpm dlx supabase db push --db-url \"$$DIRECT_URL\" --include-all || true) &&
-          ([ -f supabase/seed.sql ] && pnpm dlx supabase db seed --db-url \"$$DIRECT_URL\" || true) &&
+          ([ -d supabase/migrations ] && yes | PGSSLMODE=disable pnpm dlx supabase db push --db-url \"$$DIRECT_URL\" --include-all || true) &&
+          ([ -f supabase/seed.sql ] && PGSSLMODE=disable pnpm dlx supabase db seed --db-url \"$$DIRECT_URL\" || true) &&
           pnpm dev
         elif [ -f yarn.lock ]; then
           yarn &&
-          ([ -d supabase/migrations ] && yes | yarn dlx supabase db push --db-url \"$$DIRECT_URL\" --include-all || true) &&
-          ([ -f supabase/seed.sql ] && yarn dlx supabase db seed --db-url \"$$DIRECT_URL\" || true) &&
+          ([ -d supabase/migrations ] && yes | PGSSLMODE=disable yarn dlx supabase db push --db-url \"$$DIRECT_URL\" --include-all || true) &&
+          ([ -f supabase/seed.sql ] && PGSSLMODE=disable yarn dlx supabase db seed --db-url \"$$DIRECT_URL\" || true) &&
           yarn dev
         else
           npm install &&
-          ([ -d supabase/migrations ] && yes | npx supabase db push --db-url \"$$DIRECT_URL\" --include-all || true) &&
-          ([ -f supabase/seed.sql ] && npx supabase db seed --db-url \"$$DIRECT_URL\" || true) &&
+          ([ -d supabase/migrations ] && yes | PGSSLMODE=disable npx supabase db push --db-url \"$$DIRECT_URL\" --include-all || true) &&
+          ([ -f supabase/seed.sql ] && PGSSLMODE=disable npx supabase db seed --db-url \"$$DIRECT_URL\" || true) &&
           npm run dev
         fi
       "
@@ -70,6 +70,7 @@ services:
       - DIRECT_URL=postgres://postgres:${SERVICE_PASSWORD_POSTGRES}@supabase-db:5432/${POSTGRES_DB:-postgres}
       - NODE_ENV=development
       - WATCHPACK_POLLING=true
+      - CI=true
     volumes:
       - ./:/app                 # Mount local code for hot-reload
       - /app/.next              # Exclude build directory (keep this for build cache isolation)
