@@ -742,8 +742,6 @@ services:
         sources:
           docker_host:
             type: docker_logs
-            exclude_containers:
-              - supabase-vector
         transforms:
           project_logs:
             type: remap
@@ -761,17 +759,22 @@ services:
               del(.image)
               del(.host)
               del(.stream)
+          filter_vector:
+            type: filter
+            inputs:
+              - project_logs
+            condition: '!ends_with(string!(.appname), "-supabase-vector")'
           router:
             type: route
             inputs:
-              - project_logs
+              - filter_vector
             route:
-              kong: 'starts_with(string!(.appname), "supabase-kong")'
-              auth: 'starts_with(string!(.appname), "supabase-auth")'
-              rest: 'starts_with(string!(.appname), "supabase-rest")'
-              realtime: 'starts_with(string!(.appname), "realtime-dev")'
-              storage: 'starts_with(string!(.appname), "supabase-storage")'
-              db: 'starts_with(string!(.appname), "supabase-db")'
+              kong: 'ends_with(string!(.appname), "-supabase-kong")'
+              auth: 'ends_with(string!(.appname), "-supabase-auth")'
+              rest: 'ends_with(string!(.appname), "-supabase-rest")'
+              realtime: 'ends_with(string!(.appname), "-realtime-dev")'
+              storage: 'ends_with(string!(.appname), "-supabase-storage")'
+              db: 'ends_with(string!(.appname), "-supabase-db")'
           kong_logs:
             type: remap
             inputs:

@@ -144,6 +144,64 @@ npx supabase migration new <migration_name>
 npx supabase db push
 ```
 
+## Service Logs
+
+Access logs for any service using Docker Compose. The `COMPOSE_PROJECT_NAME` environment variable determines container name prefixes.
+
+### General Commands
+
+```bash
+# View logs for all services
+docker compose -f docker-compose.development.yml logs -f
+
+# View logs for a specific service
+docker compose -f docker-compose.development.yml logs -f <service-name>
+
+# View last 100 lines of logs
+docker compose -f docker-compose.development.yml logs --tail=100 <service-name>
+
+# View logs with timestamps
+docker compose -f docker-compose.development.yml logs -f -t <service-name>
+```
+
+### Available Services
+
+| Service | Container Name | Description |
+|---------|---------------|-------------|
+| nextjs-app | `${COMPOSE_PROJECT_NAME}-nextjs-app` | Next.js Application |
+| supabase-kong | `${COMPOSE_PROJECT_NAME}-supabase-kong` | API Gateway |
+| supabase-studio | `${COMPOSE_PROJECT_NAME}-supabase-studio` | Dashboard UI |
+| supabase-db | `${COMPOSE_PROJECT_NAME}-supabase-db` | PostgreSQL Database |
+| supabase-analytics | `${COMPOSE_PROJECT_NAME}-supabase-analytics` | Logflare Analytics |
+| supabase-vector | `${COMPOSE_PROJECT_NAME}-supabase-vector` | Log Collection |
+| supabase-rest | `${COMPOSE_PROJECT_NAME}-supabase-rest` | PostgREST API |
+| supabase-auth | `${COMPOSE_PROJECT_NAME}-supabase-auth` | GoTrue Auth |
+| realtime-dev | `${COMPOSE_PROJECT_NAME}-realtime-dev` | Realtime WebSockets |
+| supabase-minio | `${COMPOSE_PROJECT_NAME}-supabase-minio` | MinIO Storage |
+| supabase-storage | `${COMPOSE_PROJECT_NAME}-supabase-storage` | Storage API |
+| imgproxy | `${COMPOSE_PROJECT_NAME}-imgproxy` | Image Proxy |
+| supabase-meta | `${COMPOSE_PROJECT_NAME}-supabase-meta` | Postgres Meta |
+| supabase-supavisor | `${COMPOSE_PROJECT_NAME}-supabase-supavisor` | Connection Pooler |
+
+### Common Examples
+
+```bash
+# Debug Next.js application
+docker compose -f docker-compose.development.yml logs -f nextjs-app
+
+# Check database logs
+docker compose -f docker-compose.development.yml logs -f supabase-db
+
+# Monitor authentication service
+docker compose -f docker-compose.development.yml logs -f supabase-auth
+
+# Watch API gateway traffic
+docker compose -f docker-compose.development.yml logs -f supabase-kong
+
+# Check realtime connection issues
+docker compose -f docker-compose.development.yml logs -f realtime-dev
+```
+
 ## Error Handling
 
 - Use try/catch blocks for async operations
