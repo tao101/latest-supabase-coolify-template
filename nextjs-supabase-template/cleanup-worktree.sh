@@ -16,7 +16,7 @@
 set -e
 
 # Parse command-line arguments
-FORCE=false
+FORCE=true
 KEEP_VOLUMES=false
 CLEAN_ENV=false
 
@@ -197,6 +197,11 @@ for container in "${CONTAINERS[@]}"; do
         docker rm -f "$container" 2>/dev/null || true
     fi
 done
+
+# Clean up Docker-created node dependencies
+# These contain hardlinks with container paths (/app) that break host pnpm
+echo "Removing Docker-created node dependencies..."
+rm -rf .pnpm-store node_modules
 
 # Clean up .env file if requested
 if [ "$CLEAN_ENV" = true ] && [ -f ".env" ]; then

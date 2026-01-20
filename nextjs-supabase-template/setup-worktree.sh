@@ -4,19 +4,46 @@
 # Usage: ./setup-worktree.sh
 # =============================================================================
 # No arguments needed! The script automatically:
-# 1. Hashes the current directory name to get a unique offset (0-49)
+# 1. Hashes the current directory name to get a unique offset (0-998)
 # 2. Same directory always gets the same ports (deterministic)
 # 3. Creates/updates .env with the calculated ports
 # =============================================================================
 
 set -e
 
-# Get the current directory name (last component of path)
-DIR_NAME=$(basename "$(pwd)")
+# Parse command-line arguments
+FORCE=false
 
-# Hash the directory name to get a number 0-49
-# Using cksum for portability, mod 50 for range
-OFFSET=$(echo "$DIR_NAME" | cksum | awk '{print $1 % 50}')
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -f|--force)
+            FORCE=true
+            shift
+            ;;
+        -h|--help)
+            echo "Usage: ./setup-worktree.sh [options]"
+            echo ""
+            echo "Options:"
+            echo "  -f, --force    Force full setup even if services are running"
+            echo "  -h, --help     Show this help message"
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            echo "Use --help for usage information"
+            exit 1
+            ;;
+    esac
+done
+
+# Get the full path for unique port calculation
+FULL_PATH=$(pwd)
+# Get directory name for display and project naming
+DIR_NAME=$(basename "$FULL_PATH")
+
+# Hash the full path to get a number 0-998
+# Using cksum for portability, mod 999 for range
+OFFSET=$(echo "$FULL_PATH" | cksum | awk '{print $1 % 999}')
 
 # Calculate ports based on offset
 NEXTJS_PORT=$((3001 + OFFSET))
@@ -165,8 +192,45 @@ print_info() {
     echo "=========================================="
 }
 
-# Show info before docker starts
+# Function to check if main services are already running
+services_running() {
+    # Check if the main containers are running (nextjs-app and supabase-db)
+    if docker ps --format '{{.Names}}' 2>/dev/null | grep -q "^${PROJECT_NAME}-nextjs-app$" && \
+       docker ps --format '{{.Names}}' 2>/dev/null | grep -q "^${PROJECT_NAME}-supabase-db$"; then
+        return 0
+    fi
+    return 1
+}
+
+# Check if services are already running (skip heavy operations unless --force)
+if [ "$FORCE" = false ] && services_running; then
+    echo ""
+    echo "Services are already running. Use --force to restart."
+    echo ""
+    print_info
+    echo ""
+    echo "Commands:"
+    echo "  View logs: docker compose -f docker-compose.development.yml logs -f"
+    echo "  Stop:      docker compose -f docker-compose.development.yml down"
+    echo "  Restart:   docker compose -f docker-compose.development.yml down && docker compose -f docker-compose.development.yml up -d"
+    echo ""
+    echo "Migrations:"
+    echo "  Apply:     PGSSLMODE=disable npx supabase db push --db-url 'postgres://postgres:${POSTGRES_PASSWORD}@localhost:${POSTGRES_PORT}/postgres' --include-all"
+    echo ""
+    echo "Database:"
+    echo "  Reset:     PGSSLMODE=disable npx supabase db reset --db-url 'postgres://postgres:${POSTGRES_PASSWORD}@localhost:${POSTGRES_PORT}/postgres'"
+    echo "=========================================="
+    echo ""
+    echo "Success! Next.js app available at: http://localhost:${NEXTJS_PORT}"
+    exit 0
+fi
+
+# Show info before docker starts (full run path)
 print_info
+
+# Clean up any existing pnpm store to avoid path conflicts
+# Docker creates .pnpm-store with container paths (/app) that don't work on host
+rm -rf .pnpm-store
 
 echo ""
 echo "Starting Docker Compose..."
