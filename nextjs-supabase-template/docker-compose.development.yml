@@ -72,7 +72,6 @@ services:
       - CI=true
     volumes:
       - ./:/app                 # Mount local code for hot-reload
-      - /app/.next              # Exclude build directory (keep this for build cache isolation)
     depends_on:
       supabase-kong:
         condition: service_healthy
