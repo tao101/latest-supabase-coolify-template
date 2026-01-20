@@ -12,8 +12,7 @@
 # Coolify Setup:
 #   1. Create new service from this docker-compose
 #   2. Coolify auto-generates all SERVICE_* secrets
-#   3. Set SERVICE_FQDN_NEXTJSAPP to your Next.js app domain
-#   4. Set SERVICE_FQDN_SUPABASEKONG to your Supabase API domain
+#   3. Coolify auto-generates FQDNs (SERVICE_FQDN_*) based on port declarations
 #
 # Access:
 #   - Next.js App: https://${SERVICE_FQDN_NEXTJSAPP}
@@ -38,6 +37,8 @@ services:
     ports:
       - "3001:3001"
     environment:
+      # Coolify magic variable - declares FQDN and proxies traffic to port 3001
+      - SERVICE_FQDN_NEXTJSAPP_3001
       # Client-side (browser) - uses public Supabase URL
       - NEXT_PUBLIC_SUPABASE_URL=https://${SERVICE_FQDN_SUPABASEKONG}
       - NEXT_PUBLIC_SUPABASE_ANON_KEY=${SERVICE_SUPABASEANON_KEY}
@@ -78,6 +79,8 @@ services:
     ports:
       - "8000:8000"
     environment:
+      # Coolify magic variable - declares FQDN and proxies traffic to port 8000
+      - SERVICE_FQDN_SUPABASEKONG_8000
       - JWT_SECRET=${SERVICE_PASSWORD_JWT}
       - KONG_DATABASE=off
       - KONG_DECLARATIVE_CONFIG=/home/kong/kong.yml
