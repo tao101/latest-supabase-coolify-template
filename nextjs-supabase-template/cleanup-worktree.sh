@@ -231,3 +231,7 @@ if [ "$REMAINING_CONTAINERS" -gt 0 ] || ([ "$KEEP_VOLUMES" = false ] && [ "$REMA
 fi
 
 echo "=========================================="
+
+echo ""
+echo "Success!"
+exit 0

@@ -216,3 +216,7 @@ echo ""
 echo "Database:"
 echo "  Reset:     PGSSLMODE=disable npx supabase db reset --db-url 'postgres://postgres:${POSTGRES_PASSWORD}@localhost:${POSTGRES_PORT}/postgres'"
 echo "=========================================="
+
+echo ""
+echo "Success! Next.js app available at: http://localhost:${NEXTJS_PORT}"
+exit 0
