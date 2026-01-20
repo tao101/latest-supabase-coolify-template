@@ -73,6 +73,47 @@ supabase/
   - Page-specific components: `app/[page-name]/components/[component-name].tsx`
 - **Background jobs**: use Trigger.dev, create a folder for each job in `jobs/`
 
+## Pages & Components
+
+- **Server-first approach**: All pages and components should be Server Components by default
+- **Client Components**: Only use when necessary for interactivity (event handlers, hooks, browser APIs)
+- **Extraction pattern**: When client functionality is needed, extract only that part into a sub-component marked with `"use client"`
+- **Supabase Realtime**: For client components needing real-time updates:
+  - Use Supabase Realtime subscriptions
+  - Ensure the table has realtime enabled in Supabase (via migration or dashboard)
+
+## Supabase Migrations
+
+When creating tables, always include:
+
+1. **Timestamps**: Add `created_at` and `updated_at` columns with auto-update:
+   ```sql
+   created_at timestamptz default now() not null,
+   updated_at timestamptz default now() not null
+   ```
+   Create a trigger to auto-update `updated_at`:
+   ```sql
+   create trigger handle_updated_at before update on table_name
+     for each row execute function moddatetime(updated_at);
+   ```
+
+2. **RLS (Row Level Security)**: Always enable RLS and add appropriate policies:
+   ```sql
+   alter table table_name enable row level security;
+   -- Add policies based on access requirements
+   ```
+
+3. **Realtime**: Decide if the table needs realtime and enable if required:
+   ```sql
+   alter publication supabase_realtime add table table_name;
+   ```
+
+4. **Enums**: Use PostgreSQL enums for fields with predefined values:
+   ```sql
+   create type status_type as enum ('pending', 'active', 'completed');
+   -- Then use: status status_type not null default 'pending'
+   ```
+
 ## Commands
 
 ```bash
