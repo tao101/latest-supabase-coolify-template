@@ -31,17 +31,15 @@ services:
     command: >
       sh -c "
         if [ -f bun.lock ]; then
-          npm install -g bun &&
-          bun install &&
-          ([ -d supabase/migrations ] && yes | PGSSLMODE=disable bunx supabase db push --db-url \"$$DIRECT_URL\" --include-all || true) &&
-          ([ -f supabase/seed.sql ] && PGSSLMODE=disable bunx supabase db seed --db-url \"$$DIRECT_URL\" || true) &&
-          bun dev
+          npx bun@latest install &&
+          ([ -d supabase/migrations ] && yes | PGSSLMODE=disable npx bun@latest x supabase db push --db-url \"$$DIRECT_URL\" --include-all || true) &&
+          ([ -f supabase/seed.sql ] && PGSSLMODE=disable npx bun@latest x supabase db seed --db-url \"$$DIRECT_URL\" || true) &&
+          npx bun@latest dev
         elif [ -f pnpm-lock.yaml ]; then
-          npm install -g pnpm &&
-          pnpm install &&
-          ([ -d supabase/migrations ] && yes | PGSSLMODE=disable pnpm dlx supabase db push --db-url \"$$DIRECT_URL\" --include-all || true) &&
-          ([ -f supabase/seed.sql ] && PGSSLMODE=disable pnpm dlx supabase db seed --db-url \"$$DIRECT_URL\" || true) &&
-          pnpm dev
+          npx pnpm@latest install &&
+          ([ -d supabase/migrations ] && yes | PGSSLMODE=disable npx pnpm@latest dlx supabase db push --db-url \"$$DIRECT_URL\" --include-all || true) &&
+          ([ -f supabase/seed.sql ] && PGSSLMODE=disable npx pnpm@latest dlx supabase db seed --db-url \"$$DIRECT_URL\" || true) &&
+          npx pnpm@latest dev
         elif [ -f yarn.lock ]; then
           yarn &&
           ([ -d supabase/migrations ] && yes | PGSSLMODE=disable yarn dlx supabase db push --db-url \"$$DIRECT_URL\" --include-all || true) &&
