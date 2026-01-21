@@ -55,7 +55,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 120s
     depends_on:
       supabase-kong:
         condition: service_healthy
@@ -97,7 +96,6 @@ services:
       interval: 10s
       timeout: 10s
       retries: 10
-      start_period: 30s
     volumes:
       - type: bind
         source: ./volumes/api/kong.yml
@@ -385,7 +383,6 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
-      start_period: 120s
     depends_on:
       supabase-vector:
         condition: service_healthy
@@ -668,10 +665,9 @@ services:
     container_name: supabase-analytics
     healthcheck:
       test: ["CMD", "curl", "http://127.0.0.1:4000/health"]
-      timeout: 10s
-      interval: 10s
-      retries: 30
-      start_period: 60s
+      timeout: 5s
+      interval: 5s
+      retries: 10
     depends_on:
       supabase-db:
         condition: service_healthy
