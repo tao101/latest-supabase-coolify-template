@@ -12,12 +12,12 @@
 # Coolify Setup:
 #   1. Create new service from this docker-compose
 #   2. Coolify auto-generates all SERVICE_* secrets
-#   3. Coolify auto-generates FQDNs (SERVICE_FQDN_*) based on port declarations
+#   3. Coolify auto-generates URLs (SERVICE_URL_*) based on port declarations
 #
 # Access:
-#   - Next.js App: https://${SERVICE_FQDN_NEXTJSAPP}
-#   - Supabase Studio: https://${SERVICE_FQDN_SUPABASEKONG} (login with SERVICE_USER_ADMIN/SERVICE_PASSWORD_ADMIN)
-#   - Supabase API: https://${SERVICE_FQDN_SUPABASEKONG}
+#   - Next.js App: ${SERVICE_URL_NEXTJSAPP}
+#   - Supabase Studio: ${SERVICE_URL_SUPABASEKONG} (login with SERVICE_USER_ADMIN/SERVICE_PASSWORD_ADMIN)
+#   - Supabase API: ${SERVICE_URL_SUPABASEKONG}
 # =============================================================================
 #
 # documentation: https://supabase.com/docs/guides/self-hosting/docker
@@ -37,12 +37,12 @@ services:
     ports:
       - "3001:3001"
     environment:
-      # Coolify magic variable - declares FQDN and proxies traffic to port 3001
-      - SERVICE_FQDN_NEXTJSAPP_3001
+      # Coolify magic variable - generates full URL with protocol
+      - SERVICE_URL_NEXTJSAPP_3001
       # Client-side (browser) - uses public Supabase URL
-      - NEXT_PUBLIC_SUPABASE_URL=https://${SERVICE_FQDN_SUPABASEKONG}
+      - NEXT_PUBLIC_SUPABASE_URL=${SERVICE_URL_SUPABASEKONG}
       - NEXT_PUBLIC_SUPABASE_ANON_KEY=${SERVICE_SUPABASEANON_KEY}
-      - NEXT_PUBLIC_FRONTEND_URL=https://${SERVICE_FQDN_NEXTJSAPP}
+      - NEXT_PUBLIC_FRONTEND_URL=${SERVICE_URL_NEXTJSAPP}
       # Server-side - internal Docker network
       - SUPABASE_URL=http://supabase-kong:8000
       - SUPABASE_SERVICE_KEY=${SERVICE_SUPABASESERVICE_KEY}
@@ -55,7 +55,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 60s
+      start_period: 120s
     depends_on:
       supabase-kong:
         condition: service_healthy
@@ -79,8 +79,8 @@ services:
     ports:
       - "8000:8000"
     environment:
-      # Coolify magic variable - declares FQDN and proxies traffic to port 8000
-      - SERVICE_FQDN_SUPABASEKONG_8000
+      # Coolify magic variable - generates full URL with protocol for port 8000
+      - SERVICE_URL_SUPABASEKONG_8000
       - JWT_SECRET=${SERVICE_PASSWORD_JWT}
       - KONG_DATABASE=off
       - KONG_DECLARATIVE_CONFIG=/home/kong/kong.yml
@@ -95,8 +95,9 @@ services:
     healthcheck:
       test: ["CMD", "kong", "health"]
       interval: 10s
-      timeout: 5s
-      retries: 5
+      timeout: 10s
+      retries: 10
+      start_period: 30s
     volumes:
       - type: bind
         source: ./volumes/api/kong.yml
@@ -359,7 +360,7 @@ services:
       - DEFAULT_ORGANIZATION_NAME=${STUDIO_DEFAULT_ORGANIZATION:-Default Organization}
       - DEFAULT_PROJECT_NAME=${STUDIO_DEFAULT_PROJECT:-Default Project}
       - SUPABASE_URL=http://supabase-kong:8000
-      - SUPABASE_PUBLIC_URL=https://${SERVICE_FQDN_SUPABASEKONG}
+      - SUPABASE_PUBLIC_URL=${SERVICE_URL_SUPABASEKONG}
       - SUPABASE_ANON_KEY=${SERVICE_SUPABASEANON_KEY}
       - SUPABASE_SERVICE_KEY=${SERVICE_SUPABASESERVICE_KEY}
       - AUTH_JWT_SECRET=${SERVICE_PASSWORD_JWT}
@@ -368,7 +369,7 @@ services:
       - LOGFLARE_PUBLIC_ACCESS_TOKEN=${SERVICE_PASSWORD_LOGFLARE}
       - LOGFLARE_PRIVATE_ACCESS_TOKEN=${SERVICE_PASSWORD_LOGFLARE}
       - LOGFLARE_URL=http://supabase-analytics:4000
-      - SUPABASE_PUBLIC_API=https://${SERVICE_FQDN_SUPABASEKONG}
+      - SUPABASE_PUBLIC_API=${SERVICE_URL_SUPABASEKONG}
       - NEXT_PUBLIC_ENABLE_LOGS=true
       - NEXT_ANALYTICS_BACKEND_PROVIDER=postgres
 
@@ -384,6 +385,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+      start_period: 120s
     depends_on:
       supabase-vector:
         condition: service_healthy
@@ -666,9 +668,10 @@ services:
     container_name: supabase-analytics
     healthcheck:
       test: ["CMD", "curl", "http://127.0.0.1:4000/health"]
-      timeout: 5s
-      interval: 5s
-      retries: 10
+      timeout: 10s
+      interval: 10s
+      retries: 30
+      start_period: 60s
     depends_on:
       supabase-db:
         condition: service_healthy
@@ -959,9 +962,9 @@ services:
     environment:
       - GOTRUE_API_HOST=0.0.0.0
       - GOTRUE_API_PORT=9999
-      - API_EXTERNAL_URL=https://${SERVICE_FQDN_SUPABASEKONG}
+      - API_EXTERNAL_URL=${SERVICE_URL_SUPABASEKONG}
       # IMPORTANT: SITE_URL points to Next.js app for auth redirects
-      - GOTRUE_SITE_URL=https://${SERVICE_FQDN_NEXTJSAPP}
+      - GOTRUE_SITE_URL=${SERVICE_URL_NEXTJSAPP}
       - GOTRUE_DB_DRIVER=postgres
       - GOTRUE_DB_DATABASE_URL=postgres://supabase_auth_admin:${SERVICE_PASSWORD_POSTGRES}@supabase-db:5432/${POSTGRES_DB:-postgres}
       - GOTRUE_URI_ALLOW_LIST=${ADDITIONAL_REDIRECT_URLS:-}
