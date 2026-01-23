@@ -26,7 +26,8 @@ services:
       supabase-analytics:
         condition: service_healthy
     environment:
-      - SERVICE_URL_SUPABASEKONG_8000
+      # Coolify FQDN variable - set to your Supabase domain (e.g., supabase.example.com)
+      - SERVICE_FQDN_SUPABASE_KONG
       - KONG_PORT_MAPS=443:8000
       - JWT_SECRET=${SERVICE_PASSWORD_JWT}
       - KONG_DATABASE=off
@@ -293,7 +294,7 @@ services:
       supabase-analytics:
         condition: service_healthy
     environment:
-      - HOSTNAME=::
+      - HOSTNAME=0.0.0.0
       - STUDIO_PG_META_URL=http://supabase-meta:8080
       - POSTGRES_HOST=${POSTGRES_HOSTNAME:-supabase-db}
       - POSTGRES_PORT=${POSTGRES_PORT:-5432}
@@ -302,7 +303,7 @@ services:
       - DEFAULT_ORGANIZATION_NAME=${STUDIO_DEFAULT_ORGANIZATION:-Default Organization}
       - DEFAULT_PROJECT_NAME=${STUDIO_DEFAULT_PROJECT:-Default Project}
       - SUPABASE_URL=http://supabase-kong:8000
-      - SUPABASE_PUBLIC_URL=${SERVICE_URL_SUPABASEKONG}
+      - SUPABASE_PUBLIC_URL=https://${SERVICE_FQDN_SUPABASE_KONG}
       - SUPABASE_ANON_KEY=${SERVICE_SUPABASEANON_KEY}
       - SUPABASE_SERVICE_KEY=${SERVICE_SUPABASESERVICE_KEY}
       - AUTH_JWT_SECRET=${SERVICE_PASSWORD_JWT}
@@ -311,7 +312,7 @@ services:
       - LOGFLARE_PUBLIC_ACCESS_TOKEN=${SERVICE_PASSWORD_LOGFLARE}
       - LOGFLARE_PRIVATE_ACCESS_TOKEN=${SERVICE_PASSWORD_LOGFLARE}
       - LOGFLARE_URL=http://supabase-analytics:4000
-      - SUPABASE_PUBLIC_API=${SERVICE_URL_SUPABASEKONG}
+      - SUPABASE_PUBLIC_API=https://${SERVICE_FQDN_SUPABASE_KONG}
       - NEXT_PUBLIC_ENABLE_LOGS=true
       - NEXT_ANALYTICS_BACKEND_PROVIDER=postgres
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
@@ -877,7 +878,7 @@ services:
               method: 'post'
               request:
                 retry_max_duration_secs: 10
-              uri: 'http://supabase-analytics:4000/api/logs?source_name=gotrue.logs.prod&api_key=${LOGFLARE_API_KEY?LOGFLARE_API_KEY is required}'
+              uri: 'http://supabase-analytics:4000/api/logs?source_name=gotrue.logs.prod&api_key=${SERVICE_PASSWORD_LOGFLARE}'
             logflare_realtime:
               type: 'http'
               inputs:
@@ -887,7 +888,7 @@ services:
               method: 'post'
               request:
                 retry_max_duration_secs: 10
-              uri: 'http://supabase-analytics:4000/api/logs?source_name=realtime.logs.prod&api_key=${LOGFLARE_API_KEY?LOGFLARE_API_KEY is required}'
+              uri: 'http://supabase-analytics:4000/api/logs?source_name=realtime.logs.prod&api_key=${SERVICE_PASSWORD_LOGFLARE}'
             logflare_rest:
               type: 'http'
               inputs:
@@ -897,7 +898,7 @@ services:
               method: 'post'
               request:
                 retry_max_duration_secs: 10
-              uri: 'http://supabase-analytics:4000/api/logs?source_name=postgREST.logs.prod&api_key=${LOGFLARE_API_KEY?LOGFLARE_API_KEY is required}'
+              uri: 'http://supabase-analytics:4000/api/logs?source_name=postgREST.logs.prod&api_key=${SERVICE_PASSWORD_LOGFLARE}'
             logflare_db:
               type: 'http'
               inputs:
@@ -907,7 +908,7 @@ services:
               method: 'post'
               request:
                 retry_max_duration_secs: 10
-              uri: 'http://supabase-kong:8000/analytics/v1/api/logs?source_name=postgres.logs&api_key=${LOGFLARE_API_KEY?LOGFLARE_API_KEY is required}'
+              uri: 'http://supabase-kong:8000/analytics/v1/api/logs?source_name=postgres.logs&api_key=${SERVICE_PASSWORD_LOGFLARE}'
             logflare_storage:
               type: 'http'
               inputs:
@@ -917,7 +918,7 @@ services:
               method: 'post'
               request:
                 retry_max_duration_secs: 10
-              uri: 'http://supabase-analytics:4000/api/logs?source_name=storage.logs.prod.2&api_key=${LOGFLARE_API_KEY?LOGFLARE_API_KEY is required}'
+              uri: 'http://supabase-analytics:4000/api/logs?source_name=storage.logs.prod.2&api_key=${SERVICE_PASSWORD_LOGFLARE}'
             logflare_kong:
               type: 'http'
               inputs:
@@ -928,7 +929,7 @@ services:
               method: 'post'
               request:
                 retry_max_duration_secs: 10
-              uri: 'http://supabase-analytics:4000/api/logs?source_name=cloudflare.logs.prod&api_key=${LOGFLARE_API_KEY?LOGFLARE_API_KEY is required}'
+              uri: 'http://supabase-analytics:4000/api/logs?source_name=cloudflare.logs.prod&api_key=${SERVICE_PASSWORD_LOGFLARE}'
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
       - LOGFLARE_API_KEY=${SERVICE_PASSWORD_LOGFLARE}
@@ -975,10 +976,10 @@ services:
     environment:
       - GOTRUE_API_HOST=0.0.0.0
       - GOTRUE_API_PORT=9999
-      - API_EXTERNAL_URL=${API_EXTERNAL_URL:-http://supabase-kong:8000}
+      - API_EXTERNAL_URL=https://${SERVICE_FQDN_SUPABASE_KONG}
       - GOTRUE_DB_DRIVER=postgres
       - GOTRUE_DB_DATABASE_URL=postgres://supabase_auth_admin:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOSTNAME:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-postgres}
-      - GOTRUE_SITE_URL=${SERVICE_URL_SUPABASEKONG}
+      - GOTRUE_SITE_URL=https://${SERVICE_FQDN_SUPABASE_KONG}
       - GOTRUE_URI_ALLOW_LIST=${ADDITIONAL_REDIRECT_URLS:-}
       - GOTRUE_DISABLE_SIGNUP=${DISABLE_SIGNUP:-false}
       - GOTRUE_JWT_ADMIN_ROLES=service_role
@@ -1093,7 +1094,7 @@ services:
     command:
       - |
         sleep 5
-        /usr/bin/mc alias set supabase-minio http://supabase-minio:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD
+        /usr/bin/mc alias set supabase-minio http://supabase-minio:9000 $MINIO_ROOT_USER $MINIO_ROOT_PASSWORD
         /usr/bin/mc mb --ignore-existing supabase-minio/stub
         exit 0
 

@@ -12,12 +12,12 @@
 # Coolify Setup:
 #   1. Create new service from this docker-compose
 #   2. Coolify auto-generates all SERVICE_* secrets
-#   3. Coolify auto-generates URLs (SERVICE_URL_*) based on port declarations
+#   3. Set SERVICE_FQDN_SUPABASE_KONG and SERVICE_FQDN_NEXTJS_APP to your domains
 #
 # Access:
-#   - Next.js App: ${SERVICE_URL_NEXTJSAPP}
-#   - Supabase Studio: ${SERVICE_URL_SUPABASEKONG} (login with SERVICE_USER_ADMIN/SERVICE_PASSWORD_ADMIN)
-#   - Supabase API: ${SERVICE_URL_SUPABASEKONG}
+#   - Next.js App: https://${SERVICE_FQDN_NEXTJS_APP}
+#   - Supabase Studio: https://${SERVICE_FQDN_SUPABASE_KONG} (login with SERVICE_USER_ADMIN/SERVICE_PASSWORD_ADMIN)
+#   - Supabase API: https://${SERVICE_FQDN_SUPABASE_KONG}
 # =============================================================================
 #
 # documentation: https://supabase.com/docs/guides/self-hosting/docker
@@ -34,24 +34,25 @@ services:
       dockerfile: Dockerfile
     container_name: nextjs-app
     restart: unless-stopped
-    ports:
-      - "3001:3001"
     environment:
-      # Coolify magic variable - generates full URL with protocol
-      - SERVICE_URL_NEXTJSAPP_3001
+      # Coolify FQDN variable - set to your Next.js domain (e.g., app.example.com)
+      - SERVICE_FQDN_NEXTJS_APP
+      # JWT Secret - ensures proper secret generation order
+      - JWT_SECRET=${SERVICE_PASSWORD_JWT}
       # Client-side (browser) - uses public Supabase URL
-      - NEXT_PUBLIC_SUPABASE_URL=${SERVICE_URL_SUPABASEKONG}
+      - NEXT_PUBLIC_SUPABASE_URL=https://${SERVICE_FQDN_SUPABASE_KONG}
       - NEXT_PUBLIC_SUPABASE_ANON_KEY=${SERVICE_SUPABASEANON_KEY}
-      - NEXT_PUBLIC_FRONTEND_URL=${SERVICE_URL_NEXTJSAPP}
+      - NEXT_PUBLIC_FRONTEND_URL=https://${SERVICE_FQDN_NEXTJS_APP}
       # Server-side - internal Docker network
       - SUPABASE_URL=http://supabase-kong:8000
       - SUPABASE_SERVICE_KEY=${SERVICE_SUPABASESERVICE_KEY}
       # Database connections
+      # Note: pgbouncer=true is required when using Supavisor in session mode
       - DATABASE_URL=postgres://postgres.${POOLER_TENANT_ID:-dev_tenant}:${SERVICE_PASSWORD_POSTGRES}@supabase-supavisor:5432/${POSTGRES_DB:-postgres}?pgbouncer=true
       - DIRECT_URL=postgres://postgres:${SERVICE_PASSWORD_POSTGRES}@supabase-db:5432/${POSTGRES_DB:-postgres}
       - NODE_ENV=production
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:3001/api/health"]
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -75,11 +76,9 @@ services:
     depends_on:
       supabase-analytics:
         condition: service_healthy
-    ports:
-      - "8000:8000"
     environment:
-      # Coolify magic variable - generates full URL with protocol for port 8000
-      - SERVICE_URL_SUPABASEKONG_8000
+      # Coolify FQDN variable - set to your Supabase domain (e.g., supabase.example.com)
+      - SERVICE_FQDN_SUPABASE_KONG
       - JWT_SECRET=${SERVICE_PASSWORD_JWT}
       - KONG_DATABASE=off
       - KONG_DECLARATIVE_CONFIG=/home/kong/kong.yml
@@ -349,7 +348,7 @@ services:
       supabase-analytics:
         condition: service_healthy
     environment:
-      - HOSTNAME="::"
+      - HOSTNAME=0.0.0.0
       - STUDIO_PG_META_URL=http://supabase-meta:8080
       - POSTGRES_HOST=supabase-db
       - POSTGRES_PORT=5432
@@ -358,7 +357,7 @@ services:
       - DEFAULT_ORGANIZATION_NAME=${STUDIO_DEFAULT_ORGANIZATION:-Default Organization}
       - DEFAULT_PROJECT_NAME=${STUDIO_DEFAULT_PROJECT:-Default Project}
       - SUPABASE_URL=http://supabase-kong:8000
-      - SUPABASE_PUBLIC_URL=${SERVICE_URL_SUPABASEKONG}
+      - SUPABASE_PUBLIC_URL=https://${SERVICE_FQDN_SUPABASE_KONG}
       - SUPABASE_ANON_KEY=${SERVICE_SUPABASEANON_KEY}
       - SUPABASE_SERVICE_KEY=${SERVICE_SUPABASESERVICE_KEY}
       - AUTH_JWT_SECRET=${SERVICE_PASSWORD_JWT}
@@ -367,7 +366,7 @@ services:
       - LOGFLARE_PUBLIC_ACCESS_TOKEN=${SERVICE_PASSWORD_LOGFLARE}
       - LOGFLARE_PRIVATE_ACCESS_TOKEN=${SERVICE_PASSWORD_LOGFLARE}
       - LOGFLARE_URL=http://supabase-analytics:4000
-      - SUPABASE_PUBLIC_API=${SERVICE_URL_SUPABASEKONG}
+      - SUPABASE_PUBLIC_API=https://${SERVICE_FQDN_SUPABASE_KONG}
       - NEXT_PUBLIC_ENABLE_LOGS=true
       - NEXT_ANALYTICS_BACKEND_PROVIDER=postgres
 
@@ -958,9 +957,9 @@ services:
     environment:
       - GOTRUE_API_HOST=0.0.0.0
       - GOTRUE_API_PORT=9999
-      - API_EXTERNAL_URL=${SERVICE_URL_SUPABASEKONG}
+      - API_EXTERNAL_URL=https://${SERVICE_FQDN_SUPABASE_KONG}
       # IMPORTANT: SITE_URL points to Next.js app for auth redirects
-      - GOTRUE_SITE_URL=${SERVICE_URL_NEXTJSAPP}
+      - GOTRUE_SITE_URL=https://${SERVICE_FQDN_NEXTJS_APP}
       - GOTRUE_DB_DRIVER=postgres
       - GOTRUE_DB_DATABASE_URL=postgres://supabase_auth_admin:${SERVICE_PASSWORD_POSTGRES}@supabase-db:5432/${POSTGRES_DB:-postgres}
       - GOTRUE_URI_ALLOW_LIST=${ADDITIONAL_REDIRECT_URLS:-}
@@ -1018,6 +1017,7 @@ services:
       - ERL_AFLAGS=-proto_dist inet_tcp
       - ENABLE_TAILSCALE=false
       - DNS_NODES=''
+      - RLIMIT_NOFILE=10000
       - APP_NAME=realtime
       - SEED_SELF_HOST=true
       - LOG_LEVEL=error
@@ -1059,7 +1059,7 @@ services:
     command:
       - |
         sleep 5
-        /usr/bin/mc alias set supabase-minio http://supabase-minio:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD
+        /usr/bin/mc alias set supabase-minio http://supabase-minio:9000 $MINIO_ROOT_USER $MINIO_ROOT_PASSWORD
         /usr/bin/mc mb --ignore-existing supabase-minio/stub
         exit 0
 
