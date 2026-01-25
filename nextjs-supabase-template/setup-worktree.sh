@@ -13,6 +13,7 @@ set -e
 
 # Parse command-line arguments
 FORCE=false
+LIVE=false
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -20,11 +21,16 @@ while [[ $# -gt 0 ]]; do
             FORCE=true
             shift
             ;;
+        -l|--live)
+            LIVE=true
+            shift
+            ;;
         -h|--help)
             echo "Usage: ./setup-worktree.sh [options]"
             echo ""
             echo "Options:"
             echo "  -f, --force    Force full setup even if services are running"
+            echo "  -l, --live     Stream Next.js logs after setup (keeps running)"
             echo "  -h, --help     Show this help message"
             exit 0
             ;;
@@ -52,7 +58,8 @@ POSTGRES_PORT=$((5432 + OFFSET))
 POOLER_PORT=$((6543 + OFFSET))
 
 # Sanitize directory name for COMPOSE_PROJECT_NAME (alphanumeric + dash only)
-PROJECT_NAME=$(echo "$DIR_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//')
+# Include OFFSET to ensure unique container names per worktree (even if folder name is the same)
+PROJECT_NAME=$(echo "${DIR_NAME}-${OFFSET}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//')
 
 # Create .env from example if it doesn't exist
 if [ ! -f .env ] && [ -f .env.example ]; then
@@ -222,7 +229,14 @@ if [ "$FORCE" = false ] && services_running; then
     echo "=========================================="
     echo ""
     echo "Success! Next.js app available at: http://localhost:${NEXTJS_PORT}"
-    exit 0
+    if [ "$LIVE" = true ]; then
+        echo ""
+        echo "Streaming Next.js logs (Ctrl+C to stop)..."
+        echo ""
+        docker compose -f docker-compose.development.yml logs -f nextjs-app
+    else
+        exit 0
+    fi
 fi
 
 # Show info before docker starts (full run path)
@@ -265,6 +279,26 @@ if [ $RETRY_COUNT -lt $MAX_RETRIES ] && [ -d "supabase/migrations" ]; then
     PGSSLMODE=disable npx supabase db push --db-url "postgres://postgres:${POSTGRES_PASSWORD}@localhost:${POSTGRES_PORT}/postgres" --include-all --yes || echo "Migration failed or no changes to apply"
 fi
 
+# Wait for Next.js app to be ready
+echo ""
+echo "Waiting for Next.js app to be ready..."
+NEXTJS_RETRIES=0
+NEXTJS_MAX_RETRIES=150  # 5 minutes max (150 * 2 seconds)
+until curl -s -o /dev/null -w "%{http_code}" "http://localhost:${NEXTJS_PORT}" | grep -q "200\|304"; do
+    NEXTJS_RETRIES=$((NEXTJS_RETRIES + 1))
+    if [ $NEXTJS_RETRIES -ge $NEXTJS_MAX_RETRIES ]; then
+        echo "  Next.js app did not become ready in time."
+        echo "  Check logs: docker compose -f docker-compose.development.yml logs -f nextjs-app"
+        break
+    fi
+    echo "  Waiting for Next.js... ($NEXTJS_RETRIES/$NEXTJS_MAX_RETRIES)"
+    sleep 2
+done
+
+if [ $NEXTJS_RETRIES -lt $NEXTJS_MAX_RETRIES ]; then
+    echo "  Next.js app is ready!"
+fi
+
 # Show info again after docker output (easy to see at end)
 echo ""
 print_info
@@ -283,4 +317,12 @@ echo "=========================================="
 
 echo ""
 echo "Success! Next.js app available at: http://localhost:${NEXTJS_PORT}"
-exit 0
+
+if [ "$LIVE" = true ]; then
+    echo ""
+    echo "Streaming Next.js logs (Ctrl+C to stop)..."
+    echo ""
+    docker compose -f docker-compose.development.yml logs -f nextjs-app
+else
+    exit 0
+fi

@@ -1,0 +1,196 @@
+name: E2E Tests on Preview Deployment
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: e2e-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write      # For pushing to gh-pages
+  pull-requests: write # For PR comments
+
+jobs:
+  e2e-tests:
+    name: Run E2E Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: github.event.pull_request.head.repo.full_name == github.repository
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Wait for Coolify Deployment and Get URL
+        id: coolify
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const MAX_ATTEMPTS = 40;  // 40 * 30s = 20 minutes max
+            const POLL_INTERVAL = 30000;  // 30 seconds
+            const BOT_LOGIN = 'tao-github-veedoo-coolify[bot]';
+
+            for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+              console.log(`Attempt ${attempt}/${MAX_ATTEMPTS}: Checking for Coolify deployment...`);
+
+              const { data: comments } = await github.rest.issues.listComments({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number
+              });
+
+              // Find the Coolify bot comment
+              const coolifyComment = comments.find(c =>
+                c.user.login === BOT_LOGIN ||
+                c.user.login.includes('coolify')
+              );
+
+              if (coolifyComment) {
+                const body = coolifyComment.body;
+
+                // Check if deployment is ready
+                if (body.includes('is ready.') && body.includes('🟢')) {
+                  // Extract nextjs_app URL using regex
+                  const match = body.match(/\[Open nextjs_app\]\((https?:\/\/[^\)]+)\)/);
+                  if (match && match[1]) {
+                    console.log(`✅ Deployment ready! URL: ${match[1]}`);
+                    core.setOutput('url', match[1]);
+                    return;
+                  }
+                }
+
+                // Check for failure
+                if (body.includes('failed') || body.includes('🔴')) {
+                  core.setFailed('Coolify deployment failed');
+                  return;
+                }
+
+                console.log('Deployment in progress...');
+              } else {
+                console.log('No Coolify comment found yet...');
+              }
+
+              if (attempt < MAX_ATTEMPTS) {
+                await new Promise(r => setTimeout(r, POLL_INTERVAL));
+              }
+            }
+
+            core.setFailed('Timeout waiting for Coolify deployment');
+
+      - name: Wait for App to be Ready
+        uses: jtalk/url-health-check-action@v4
+        with:
+          url: ${{ steps.coolify.outputs.url }}
+          max-attempts: 10
+          retry-delay: 15s
+          retry-all: true
+          follow-redirect: true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Browsers
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run Playwright E2E Tests
+        id: e2e-tests
+        run: pnpm test:e2e
+        env:
+          CI: true
+          PLAYWRIGHT_BASE_URL: ${{ steps.coolify.outputs.url }}
+          E2E_TEST_USER_EMAIL: ${{ secrets.E2E_TEST_USER_EMAIL }}
+          E2E_TEST_USER_PASSWORD: ${{ secrets.E2E_TEST_USER_PASSWORD }}
+
+      - name: Upload Test Results Artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report-pr-${{ github.event.pull_request.number }}-run-${{ github.run_id }}
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 30
+
+      - name: Deploy Report to GitHub Pages
+        if: always()
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./playwright-report
+          destination_dir: reports/pr-${{ github.event.pull_request.number }}/${{ github.run_id }}
+          keep_files: true
+
+      - name: Comment PR with Report Link
+        if: always()
+        uses: actions/github-script@v7
+        env:
+          TEST_OUTCOME: ${{ steps.e2e-tests.outcome }}
+        with:
+          script: |
+            const prNumber = context.payload.pull_request.number;
+            const runId = context.runId;
+            const repo = context.repo.repo;
+            const owner = context.repo.owner;
+            const testOutcome = process.env.TEST_OUTCOME;
+
+            // Determine status display
+            const passed = testOutcome === 'success';
+            const statusEmoji = passed ? '✅' : '❌';
+            const statusText = passed ? 'Passed' : 'Failed';
+
+            // Construct the report URL
+            const reportUrl = `https://${owner}.github.io/${repo}/reports/pr-${prNumber}/${runId}/`;
+
+            const body = [
+              `## ${statusEmoji} Playwright E2E Test Results - ${statusText}`,
+              '',
+              `**Run ID:** #${runId}`,
+              `**Status:** ${statusEmoji} ${statusText}`,
+              '',
+              `**[View Full Report](${reportUrl})**`,
+              '',
+              'This report includes:',
+              '- Test results and assertions',
+              '- Screenshots of failures',
+              '- Video recordings of failed tests',
+              '- Trace files for debugging',
+              '',
+              '_Report preserved at unique URL._'
+            ].join('\n');
+
+            // Always create a new comment
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: prNumber,
+              body
+            });
+
+            // Also add to job summary
+            core.summary.addHeading(`Playwright Test Report - ${statusText}`);
+            core.summary.addLink('View Full Report', reportUrl);
+            await core.summary.write();

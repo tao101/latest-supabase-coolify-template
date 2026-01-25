@@ -52,23 +52,18 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Get the full path for port calculation (must match setup-worktree.sh logic)
+# Get the full path for unique port calculation
 FULL_PATH=$(pwd)
 # Get directory name for display and project naming
 DIR_NAME=$(basename "$FULL_PATH")
 
-# Hash the full path to get offset (same algorithm as setup-worktree.sh)
+# Hash the full path to get a unique offset (must match setup-worktree.sh)
 OFFSET=$(echo "$FULL_PATH" | cksum | awk '{print $1 % 999}')
-
-# Calculate ports based on offset (for display purposes)
-NEXTJS_PORT=$((3001 + OFFSET))
-KONG_PORT=$((8000 + OFFSET))
-POSTGRES_PORT=$((5432 + OFFSET))
-POOLER_PORT=$((6543 + OFFSET))
 
 # Sanitize directory name for COMPOSE_PROJECT_NAME (alphanumeric + dash only)
 # This must match the logic in setup-worktree.sh
-PROJECT_NAME=$(echo "$DIR_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//')
+# Include OFFSET to ensure unique container names per worktree (even if folder name is the same)
+PROJECT_NAME=$(echo "${DIR_NAME}-${OFFSET}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//')
 
 # Check if docker-compose.development.yml exists
 if [ ! -f "docker-compose.development.yml" ]; then
@@ -133,13 +128,6 @@ echo "=========================================="
 echo "Cleanup Worktree: $DIR_NAME"
 echo "=========================================="
 echo "Project Name: $PROJECT_NAME"
-echo "Port Offset:  $OFFSET"
-echo ""
-echo "Ports (for reference):"
-echo "  Next.js:    $NEXTJS_PORT"
-echo "  Kong API:   $KONG_PORT"
-echo "  PostgreSQL: $POSTGRES_PORT"
-echo "  Pooler:     $POOLER_PORT"
 echo ""
 echo "Resources to clean:"
 echo "  Containers: ${EXISTING_CONTAINERS}/${#CONTAINERS[@]} found"
