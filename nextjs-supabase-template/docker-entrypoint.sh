@@ -49,7 +49,7 @@ if [ -d "./supabase/migrations" ]; then
         #   --db-url: Direct database connection (not pooled)
         #   --include-all: Include all migrations not found on remote history table
         #   yes |: Auto-confirm prompts for CI/non-interactive environments
-        PGSSLMODE=disable yes | npx supabase db push --db-url "$DIRECT_URL" --include-all
+        yes | PGSSLMODE=disable npx supabase db push --db-url "$DIRECT_URL" --include-all
 
         echo "Supabase migrations completed successfully."
     fi
