@@ -43,10 +43,53 @@
 
 ## Environment Variables
 
-- Store all secrets in `.env.local` (never commit)
-- Use `.env.example` as template for required variables
+- Store all secrets in `.env` (never commit — git-ignored)
+- Use `env.development` (local Docker) and `env.production` (Coolify) as templates
 - Access via `process.env.VARIABLE_NAME`
 - Validate required env vars at startup
+
+## Development Architecture
+
+Everything runs inside Docker containers via `docker-compose.development.yml`:
+
+- **`./setup-worktree.sh`** is the single entry point — generates unique ports, creates `.env` from `env.development`, starts all containers, runs migrations, and waits for readiness
+- **Hot-reload** — local code is mounted into the Next.js container (`./:/app`), so file changes are reflected immediately
+- **Internal Docker networking** — server-side code uses internal hostnames (e.g., `supabase-kong:8000`, `supabase-db:5432`), while the browser uses `localhost` with mapped ports
+- **Multiple projects** can run simultaneously — each gets unique ports and container names derived from directory path
+
+## Executing Commands in Containers
+
+Container names follow the pattern `${COMPOSE_PROJECT_NAME}-<service-name>`. The `COMPOSE_PROJECT_NAME` is set in `.env` by `setup-worktree.sh` (derived from directory name + hash offset), ensuring each project gets unique container names.
+
+### Finding Container Names
+
+```bash
+# List all containers for your project
+docker ps --format '{{.Names}}' | grep "^$(grep COMPOSE_PROJECT_NAME .env | cut -d= -f2)"
+
+# Or use docker compose (auto-resolves project name from .env)
+docker compose -f docker-compose.development.yml ps
+```
+
+### Running Commands
+
+```bash
+# Interactive shell in the Next.js container
+docker exec -it <project-name>-nextjs-app sh
+
+# Run a one-off command (e.g., install a package)
+docker exec <project-name>-nextjs-app npx pnpm add <package>
+
+# Access the PostgreSQL database directly
+docker exec -it <project-name>-supabase-db psql -U postgres
+
+# Run Supabase migrations from the Next.js container
+docker exec <project-name>-nextjs-app sh -c 'PGSSLMODE=disable npx supabase db push --db-url "$DIRECT_URL" --include-all'
+
+# Alternative: use docker compose exec (auto-resolves container name)
+docker compose -f docker-compose.development.yml exec nextjs-app sh
+docker compose -f docker-compose.development.yml exec supabase-db psql -U postgres
+```
 
 ## File Organization
 
@@ -139,9 +182,15 @@ docker compose -f docker-compose.development.yml restart
 # Cleanup worktree
 ./cleanup-worktree.sh
 
-# Database migrations (run inside container or with direct DB access)
+# Database migrations
+# Option 1: Via docker compose exec (recommended — uses internal networking)
+docker compose -f docker-compose.development.yml exec nextjs-app sh -c 'PGSSLMODE=disable npx supabase db push --db-url "$DIRECT_URL" --include-all'
+
+# Option 2: From host (requires supabase CLI and DB port exposed)
+PGSSLMODE=disable npx supabase db push --db-url "postgres://postgres:<password>@localhost:<port>/postgres" --include-all
+
+# Create a new migration file
 npx supabase migration new <migration_name>
-npx supabase db push
 ```
 
 ## Service Logs

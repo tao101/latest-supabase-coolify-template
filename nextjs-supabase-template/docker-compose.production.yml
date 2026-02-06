@@ -34,6 +34,12 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        # NEXT_PUBLIC_* use placeholders at build time - replaced at container startup
+        # by docker-entrypoint.sh using runtime environment values from Coolify.
+        # This supports both main deployments AND PR preview deployments.
+        - SUPABASE_URL=http://supabase-kong:8000
+        - SUPABASE_SERVICE_KEY=${SERVICE_SUPABASESERVICE_KEY}
     container_name: nextjs-app
     hostname: nextjs-app
     restart: unless-stopped
@@ -96,10 +102,10 @@ services:
           - username: DASHBOARD
           - username: anon
             keyauth_credentials:
-              - key: $$SUPABASE_ANON_KEY
+              - key: $SUPABASE_ANON_KEY
           - username: service_role
             keyauth_credentials:
-              - key: $$SUPABASE_SERVICE_KEY
+              - key: $SUPABASE_SERVICE_KEY
 
         ###
         ### Access Control List
@@ -115,8 +121,8 @@ services:
         ###
         basicauth_credentials:
         - consumer: DASHBOARD
-          username: $$DASHBOARD_USERNAME
-          password: $$DASHBOARD_PASSWORD
+          username: $DASHBOARD_USERNAME
+          password: $DASHBOARD_PASSWORD
 
         ###
         ### API Routes
@@ -318,7 +324,7 @@ services:
                 config:
                   hide_credentials: true
         KONGCONFIG
-        eval "echo \"$$(cat /home/kong/temp.yml)\"" > /home/kong/kong.yml && /docker-entrypoint.sh kong docker-start
+        eval "echo \"$(cat /home/kong/temp.yml)\"" > /home/kong/kong.yml && /docker-entrypoint.sh kong docker-start
     depends_on:
       supabase-analytics:
         condition: service_healthy
@@ -391,6 +397,8 @@ services:
     image: supabase/postgres:15.14.1.071
     container_name: supabase-db
     hostname: supabase-db
+    ports:
+      - "${POSTGRES_PUBLIC_PORT:-0}:5432"
     shm_size: 1g
     healthcheck:
       test: pg_isready -U postgres -h 127.0.0.1
@@ -466,7 +474,7 @@ services:
         CREATE FUNCTION supabase_functions.http_request()
           RETURNS trigger
           LANGUAGE plpgsql
-          AS $$FUNCTIONBODY$$
+          AS $FUNCTIONBODY$
           DECLARE
             request_id bigint;
             payload jsonb;
@@ -529,9 +537,9 @@ services:
               (TG_RELID, TG_NAME, request_id);
             RETURN NEW;
           END
-        $$FUNCTIONBODY$$;
+        $FUNCTIONBODY$;
         DO
-        $$DOBLOCK1$$
+        $DOBLOCK1$
         BEGIN
           IF NOT EXISTS (
             SELECT 1
@@ -542,7 +550,7 @@ services:
             CREATE USER supabase_functions_admin NOINHERIT CREATEROLE LOGIN NOREPLICATION;
           END IF;
         END
-        $$DOBLOCK1$$;
+        $DOBLOCK1$;
         GRANT ALL PRIVILEGES ON SCHEMA supabase_functions TO supabase_functions_admin;
         GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA supabase_functions TO supabase_functions_admin;
         GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA supabase_functions TO supabase_functions_admin;
@@ -552,7 +560,7 @@ services:
         ALTER function "supabase_functions".http_request() OWNER TO supabase_functions_admin;
         GRANT supabase_functions_admin TO postgres;
         DO
-        $$DOBLOCK2$$
+        $DOBLOCK2$
         BEGIN
           IF EXISTS (
             SELECT 1
@@ -565,9 +573,9 @@ services:
             DROP ROLE supabase_pg_net_admin;
           END IF;
         END
-        $$DOBLOCK2$$;
+        $DOBLOCK2$;
         DO
-        $$DOBLOCK3$$
+        $DOBLOCK3$
         BEGIN
           IF EXISTS (
             SELECT 1
@@ -586,11 +594,11 @@ services:
             GRANT EXECUTE ON FUNCTION net.http_post(url text, body jsonb, params jsonb, headers jsonb, timeout_milliseconds integer) TO supabase_functions_admin, postgres, anon, authenticated, service_role;
           END IF;
         END
-        $$DOBLOCK3$$;
+        $DOBLOCK3$;
         CREATE OR REPLACE FUNCTION extensions.grant_pg_net_access()
         RETURNS event_trigger
         LANGUAGE plpgsql
-        AS $$EVENTFUNC$$
+        AS $EVENTFUNC$
         BEGIN
           IF EXISTS (
             SELECT 1
@@ -611,10 +619,10 @@ services:
             GRANT EXECUTE ON FUNCTION net.http_post(url text, body jsonb, params jsonb, headers jsonb, timeout_milliseconds integer) TO supabase_functions_admin, postgres, anon, authenticated, service_role;
           END IF;
         END;
-        $$EVENTFUNC$$;
+        $EVENTFUNC$;
         COMMENT ON FUNCTION extensions.grant_pg_net_access IS 'Grants access to pg_net';
         DO
-        $$DOBLOCK4$$
+        $DOBLOCK4$
         BEGIN
           IF NOT EXISTS (
             SELECT 1
@@ -625,7 +633,7 @@ services:
             EXECUTE PROCEDURE extensions.grant_pg_net_access();
           END IF;
         END
-        $$DOBLOCK4$$;
+        $DOBLOCK4$;
         INSERT INTO supabase_functions.migrations (version) VALUES ('20210809183423_update_grants');
         ALTER function supabase_functions.http_request() SECURITY DEFINER;
         ALTER function supabase_functions.http_request() SET search_path = supabase_functions;
@@ -636,7 +644,7 @@ services:
 
         # 99-roles.sql - Set role passwords
         cat > /docker-entrypoint-initdb.d/init-scripts/99-roles.sql << 'SQLEOF'
-        \set pgpass `echo "$$POSTGRES_PASSWORD"`
+        \set pgpass `echo "$POSTGRES_PASSWORD"`
         ALTER USER authenticator WITH PASSWORD :'pgpass';
         ALTER USER pgbouncer WITH PASSWORD :'pgpass';
         ALTER USER supabase_auth_admin WITH PASSWORD :'pgpass';
@@ -646,8 +654,8 @@ services:
 
         # 99-jwt.sql - Set JWT settings
         cat > /docker-entrypoint-initdb.d/init-scripts/99-jwt.sql << 'SQLEOF'
-        \set jwt_secret `echo "$$JWT_SECRET"`
-        \set jwt_exp `echo "$$JWT_EXP"`
+        \set jwt_secret `echo "$JWT_SECRET"`
+        \set jwt_exp `echo "$JWT_EXP"`
         \set db_name `echo "${POSTGRES_DB:-postgres}"`
         ALTER DATABASE :db_name SET "app.settings.jwt_secret" TO :'jwt_secret';
         ALTER DATABASE :db_name SET "app.settings.jwt_exp" TO :'jwt_exp';
@@ -737,14 +745,14 @@ services:
           docker_host:
             type: docker_logs
             include_containers:
-              - "*-$${COOLIFY_RESOURCE_UUID}*"
+              - "*-${COOLIFY_RESOURCE_UUID}*"
         transforms:
           project_logs:
             type: remap
             inputs:
               - docker_host
             source: |-
-              .project = "$${COOLIFY_RESOURCE_UUID}"
+              .project = "${COOLIFY_RESOURCE_UUID}"
               .event_message = del(.message)
               .appname = del(.container_name)
               del(.container_created_at)
@@ -828,7 +836,7 @@ services:
             inputs:
               - router.rest
             source: |-
-              parsed, err = parse_regex(.event_message, r'^(?P<time>.*): (?P<msg>.*)$$')
+              parsed, err = parse_regex(.event_message, r'^(?P<time>.*): (?P<msg>.*)$')
               if err == null {
                   .event_message = parsed.msg
                   .timestamp = to_timestamp!(parsed.time)
@@ -841,7 +849,7 @@ services:
             source: |-
               .metadata.project = del(.project)
               .metadata.external_id = .metadata.project
-              parsed, err = parse_regex(.event_message, r'^(?P<time>\d+:\d+:\d+\.\d+) \[(?P<level>\w+)\] (?P<msg>.*)$$')
+              parsed, err = parse_regex(.event_message, r'^(?P<time>\d+:\d+:\d+\.\d+) \[(?P<level>\w+)\] (?P<msg>.*)$')
               if err == null {
                   .event_message = parsed.msg
                   .metadata.level = parsed.level
@@ -889,7 +897,7 @@ services:
             method: 'post'
             request:
               retry_max_duration_secs: 10
-            uri: 'http://supabase-analytics:4000/api/logs?source_name=gotrue.logs.prod&api_key=$${LOGFLARE_API_KEY}'
+            uri: 'http://supabase-analytics:4000/api/logs?source_name=gotrue.logs.prod&api_key=${LOGFLARE_API_KEY}'
           logflare_realtime:
             type: 'http'
             inputs:
@@ -899,7 +907,7 @@ services:
             method: 'post'
             request:
               retry_max_duration_secs: 10
-            uri: 'http://supabase-analytics:4000/api/logs?source_name=realtime.logs.prod&api_key=$${LOGFLARE_API_KEY}'
+            uri: 'http://supabase-analytics:4000/api/logs?source_name=realtime.logs.prod&api_key=${LOGFLARE_API_KEY}'
           logflare_rest:
             type: 'http'
             inputs:
@@ -909,7 +917,7 @@ services:
             method: 'post'
             request:
               retry_max_duration_secs: 10
-            uri: 'http://supabase-analytics:4000/api/logs?source_name=postgREST.logs.prod&api_key=$${LOGFLARE_API_KEY}'
+            uri: 'http://supabase-analytics:4000/api/logs?source_name=postgREST.logs.prod&api_key=${LOGFLARE_API_KEY}'
           logflare_db:
             type: 'http'
             inputs:
@@ -919,7 +927,7 @@ services:
             method: 'post'
             request:
               retry_max_duration_secs: 10
-            uri: 'http://supabase-kong:8000/analytics/v1/api/logs?source_name=postgres.logs&api_key=$${LOGFLARE_API_KEY}'
+            uri: 'http://supabase-kong:8000/analytics/v1/api/logs?source_name=postgres.logs&api_key=${LOGFLARE_API_KEY}'
           logflare_storage:
             type: 'http'
             inputs:
@@ -929,7 +937,7 @@ services:
             method: 'post'
             request:
               retry_max_duration_secs: 10
-            uri: 'http://supabase-analytics:4000/api/logs?source_name=storage.logs.prod.2&api_key=$${LOGFLARE_API_KEY}'
+            uri: 'http://supabase-analytics:4000/api/logs?source_name=storage.logs.prod.2&api_key=${LOGFLARE_API_KEY}'
           logflare_kong:
             type: 'http'
             inputs:
@@ -940,7 +948,7 @@ services:
             method: 'post'
             request:
               retry_max_duration_secs: 10
-            uri: 'http://supabase-analytics:4000/api/logs?source_name=cloudflare.logs.prod&api_key=$${LOGFLARE_API_KEY}'
+            uri: 'http://supabase-analytics:4000/api/logs?source_name=cloudflare.logs.prod&api_key=${LOGFLARE_API_KEY}'
         VECTORCONFIG
         exec vector --config /tmp/vector.yml
 
@@ -1090,7 +1098,7 @@ services:
     command:
       - |
         sleep 5
-        /usr/bin/mc alias set supabase-minio http://supabase-minio:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD
+        /usr/bin/mc alias set supabase-minio http://supabase-minio:9000 $MINIO_ROOT_USER $MINIO_ROOT_PASSWORD
         /usr/bin/mc mb --ignore-existing supabase-minio/stub
         exit 0
 
@@ -1275,7 +1283,7 @@ services:
           {:ok, _} = Supavisor.Tenants.create_tenant(params)
         end
         POOLERCONFIG
-        /app/bin/migrate && /app/bin/supavisor eval "$$(cat /etc/pooler/pooler.exs)" && /app/bin/server
+        /app/bin/migrate && /app/bin/supavisor eval "$(cat /etc/pooler/pooler.exs)" && /app/bin/server
 
 volumes:
   supabase-db-data:

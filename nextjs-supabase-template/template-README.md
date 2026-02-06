@@ -32,6 +32,7 @@ Your app is now running at http://localhost:3001
 - Docker and Docker Compose
 - Node.js 22+ (for local development outside Docker)
 - Git (for worktree support)
+- Supabase packages: `@supabase/supabase-js`, `@supabase/ssr`, `server-only`
 
 ## Setting Up a New Project
 
@@ -46,11 +47,14 @@ cp Dockerfile your-project/
 cp docker-entrypoint.sh your-project/
 cp setup-worktree.sh your-project/
 cp cleanup-worktree.sh your-project/
-cp .env.example your-project/
-cp next.config.example.js your-project/  # Reference for standalone output
-cp playwright.config.ts your-project/    # E2E test configuration
-cp -r tests/ your-project/               # E2E test files
-cp -r .github/ your-project/             # CI/CD workflows
+cp env.development your-project/          # Development environment template
+cp env.production your-project/           # Production (Coolify) environment template
+cp proxy.ts your-project/                 # Auth token refresh proxy
+cp next.config.example.js your-project/   # Reference for standalone output
+cp playwright.config.ts your-project/     # E2E test configuration
+cp -r lib/ your-project/                  # Supabase client utilities
+cp -r tests/ your-project/                # E2E test files
+cp -r .github/ your-project/              # CI/CD workflows
 ```
 
 ### 2. Configure next.config.js
@@ -77,11 +81,91 @@ cd your-project
 
 This creates a `.env` file with automatically assigned ports based on your directory name.
 
-### 4. Start Development
+### 4. Install Supabase Packages
+
+```bash
+pnpm add @supabase/supabase-js @supabase/ssr server-only
+```
+
+### 5. Start Development
 
 ```bash
 docker compose -f docker-compose.development.yml up
 ```
+
+## Supabase Client Setup
+
+The template includes pre-configured Supabase clients in `lib/supabase/` that handle the Docker networking challenge: the server uses an internal Docker URL (`http://supabase-kong:8000`) while the browser uses the public URL. A fixed cookie name ensures auth works seamlessly across both.
+
+### Client Files
+
+| File | Use In | Description |
+|------|--------|-------------|
+| `lib/supabase/client.ts` | Client Components | Browser client for `"use client"` components |
+| `lib/supabase/server.ts` | Server Components, Actions, Route Handlers | Server client with cookie handling |
+| `lib/supabase/admin.ts` | Server-only code | Admin client with service role (bypasses RLS) |
+| `proxy.ts` | Automatic | Refreshes auth tokens on every request |
+
+### Usage Examples
+
+**Client Component:**
+
+```tsx
+"use client";
+import { createClient } from "@/lib/supabase/client";
+
+export function MyComponent() {
+  const supabase = createClient();
+  // use supabase...
+}
+```
+
+**Server Component:**
+
+```tsx
+import { createClient } from "@/lib/supabase/server";
+
+export default async function Page() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  // use supabase...
+}
+```
+
+**Server Action / Route Handler:**
+
+```tsx
+"use server";
+import { createClient } from "@/lib/supabase/server";
+
+export async function myAction() {
+  const supabase = await createClient();
+  // use supabase...
+}
+```
+
+**Admin (service role, bypasses RLS):**
+
+```tsx
+import { createAdminClient } from "@/lib/supabase/admin";
+
+// Server-only - never use in client components
+const supabase = createAdminClient();
+const { data } = await supabase.from("users").select("*");
+```
+
+### How the Fixed Cookie Works
+
+`@supabase/ssr` normally derives cookie names from the Supabase URL. Since the server uses `http://supabase-kong:8000` (internal Docker) and the browser uses the public URL, they'd get different cookie names and auth would break.
+
+All clients use `cookieOptions.name = "sb-self-hosted-auth-token"` from `lib/supabase/cookie-options.ts`, forcing the same cookie name regardless of URL.
+
+### Environment Files
+
+| File | Used By | Description |
+|------|---------|-------------|
+| `env.development` | `docker-compose.development.yml` | Local Docker development (copied to `.env` by `setup-worktree.sh`) |
+| `env.production` | `docker-compose.production.yml` | Coolify production deployment reference |
 
 ## Development Workflow
 
@@ -518,6 +602,10 @@ Key settings in `playwright.config.ts`:
 | `POOLER_PORT` | `6543` | Connection pooler external port |
 | `POSTGRES_DB` | `postgres` | Database name |
 | `POOLER_TENANT_ID` | `dev_tenant` | Supavisor tenant identifier |
+| `NEXT_PUBLIC_SUPABASE_URL` | `http://localhost:8000` | Public Supabase URL (browser) |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | — | Anonymous key for client auth |
+| `SUPABASE_URL` | `http://supabase-kong:8000` | Internal Docker URL (server-side) |
+| `SUPABASE_SERVICE_KEY` | — | Service role key (server-only, bypasses RLS) |
 
 ### Docker Compose Services
 

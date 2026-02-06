@@ -61,10 +61,10 @@ POOLER_PORT=$((6543 + OFFSET))
 # Include OFFSET to ensure unique container names per worktree (even if folder name is the same)
 PROJECT_NAME=$(echo "${DIR_NAME}-${OFFSET}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//')
 
-# Create .env from example if it doesn't exist
-if [ ! -f .env ] && [ -f .env.example ]; then
-    cp .env.example .env
-    echo "Created .env from .env.example"
+# Create .env from env.development if it doesn't exist
+if [ ! -f .env ] && [ -f env.development ]; then
+    cp env.development .env
+    echo "Created .env from env.development"
 fi
 
 # Function to update or add an environment variable

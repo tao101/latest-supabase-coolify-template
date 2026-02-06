@@ -26,29 +26,28 @@ services:
     container_name: ${COMPOSE_PROJECT_NAME:?COMPOSE_PROJECT_NAME is required - run ./setup-worktree.sh first}-nextjs-app
     working_dir: /app
     user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
-    # Install deps, run Supabase migrations (with auto-confirm), run seeds if exist, then start dev server
+    # Install deps, run Supabase migrations + seeds (tracked by hash, first-run only), then start dev server
     # Auto-detects package manager: bun > pnpm (preferred) > yarn > npm (fallback)
     command: >
       sh -c "
+        if [ -f supabase/seed.sql ] && [ ! -f supabase/config.toml ]; then
+          printf '[project]\nid = \"self-hosted\"\n\n[db.seed]\nenabled = true\nsql_paths = [\"./seed.sql\"]\n' > supabase/config.toml;
+        fi &&
         if [ -f bun.lock ]; then
           npx bun@latest install &&
-          ([ -d supabase/migrations ] && yes | PGSSLMODE=disable npx bun@latest x supabase db push --db-url \"$$DIRECT_URL\" --include-all || true) &&
-          ([ -f supabase/seed.sql ] && PGSSLMODE=disable npx bun@latest x supabase db seed --db-url \"$$DIRECT_URL\" || true) &&
+          (([ -d supabase/migrations ] || [ -f supabase/seed.sql ]) && yes | PGSSLMODE=disable npx bun@latest x supabase db push --db-url \"$$DIRECT_URL\" --include-all --include-seed || true) &&
           npx bun@latest dev
         elif [ -f pnpm-lock.yaml ]; then
           npx pnpm@latest install &&
-          ([ -d supabase/migrations ] && yes | PGSSLMODE=disable npx pnpm@latest dlx supabase db push --db-url \"$$DIRECT_URL\" --include-all || true) &&
-          ([ -f supabase/seed.sql ] && PGSSLMODE=disable npx pnpm@latest dlx supabase db seed --db-url \"$$DIRECT_URL\" || true) &&
+          (([ -d supabase/migrations ] || [ -f supabase/seed.sql ]) && yes | PGSSLMODE=disable npx pnpm@latest dlx supabase db push --db-url \"$$DIRECT_URL\" --include-all --include-seed || true) &&
           npx pnpm@latest dev
         elif [ -f yarn.lock ]; then
           yarn &&
-          ([ -d supabase/migrations ] && yes | PGSSLMODE=disable yarn dlx supabase db push --db-url \"$$DIRECT_URL\" --include-all || true) &&
-          ([ -f supabase/seed.sql ] && PGSSLMODE=disable yarn dlx supabase db seed --db-url \"$$DIRECT_URL\" || true) &&
+          (([ -d supabase/migrations ] || [ -f supabase/seed.sql ]) && yes | PGSSLMODE=disable yarn dlx supabase db push --db-url \"$$DIRECT_URL\" --include-all --include-seed || true) &&
           yarn dev
         else
           npm install &&
-          ([ -d supabase/migrations ] && yes | PGSSLMODE=disable npx supabase db push --db-url \"$$DIRECT_URL\" --include-all || true) &&
-          ([ -f supabase/seed.sql ] && PGSSLMODE=disable npx supabase db seed --db-url \"$$DIRECT_URL\" || true) &&
+          (([ -d supabase/migrations ] || [ -f supabase/seed.sql ]) && yes | PGSSLMODE=disable npx supabase db push --db-url \"$$DIRECT_URL\" --include-all --include-seed || true) &&
           npm run dev
         fi
       "

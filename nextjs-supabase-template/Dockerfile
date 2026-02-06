@@ -36,6 +36,28 @@ RUN \
 FROM node:22-alpine AS builder
 WORKDIR /app
 
+# Build-time placeholders for NEXT_PUBLIC_* (replaced at runtime by docker-entrypoint.sh)
+# Coolify's SERVICE_FQDN_* variables are only available at runtime, not build time.
+# Placeholders get baked into JS, then replaced by docker-entrypoint.sh at container startup.
+# This supports both main deployments AND PR preview deployments with dynamic URLs.
+#
+# IMPORTANT: We use _BUILD_PLACEHOLDER_* names (not NEXT_PUBLIC_*) because Coolify
+# automatically passes all environment variables as --build-arg, which would override
+# our placeholder defaults. Using different names ensures placeholders are preserved.
+ARG _BUILD_PLACEHOLDER_SUPABASE_URL=__NEXT_PUBLIC_SUPABASE_URL_PLACEHOLDER__
+ARG _BUILD_PLACEHOLDER_SUPABASE_ANON_KEY=__NEXT_PUBLIC_SUPABASE_ANON_KEY_PLACEHOLDER__
+ARG _BUILD_PLACEHOLDER_FRONTEND_URL=__NEXT_PUBLIC_FRONTEND_URL_PLACEHOLDER__
+ARG SUPABASE_URL
+ARG SUPABASE_SERVICE_KEY
+
+# Convert to ENV for Next.js build
+# The NEXT_PUBLIC_* values will be placeholders that get replaced at container startup
+ENV NEXT_PUBLIC_SUPABASE_URL=${_BUILD_PLACEHOLDER_SUPABASE_URL}
+ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=${_BUILD_PLACEHOLDER_SUPABASE_ANON_KEY}
+ENV NEXT_PUBLIC_FRONTEND_URL=${_BUILD_PLACEHOLDER_FRONTEND_URL}
+ENV SUPABASE_URL=${SUPABASE_URL}
+ENV SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
+
 # Copy dependencies from deps stage
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -76,8 +98,9 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# Copy Supabase migrations folder for runtime migrations
-COPY --from=builder /app/supabase ./supabase
+# Copy Supabase folder for runtime migrations and seeds
+# --chown needed so entrypoint can create fallback config.toml if missing
+COPY --from=builder --chown=nextjs:nodejs /app/supabase ./supabase
 
 # Copy entrypoint script
 COPY docker-entrypoint.sh ./
